@@ -1,0 +1,33 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>Digests</h1>
+  <p class="nf-tagline">
+    One markdown summary per completed night.
+  </p>
+</section>
+
+{{if .Nights}}
+<section>
+  <table class="nf-table">
+    <thead>
+      <tr><th>Started</th><th>Night</th><th>Summary</th><th></th></tr>
+    </thead>
+    <tbody>
+      {{range .Nights}}
+      <tr>
+        <td>{{.StartedAt.Format "2006-01-02 15:04 MST"}}</td>
+        <td><code>{{.ID}}</code></td>
+        <td>{{if .Summary}}{{.Summary}}{{else}}—{{end}}</td>
+        <td>
+          <a href="/digests/{{.ID}}">view</a> ·
+          <a href="/api/v1/nights/{{.ID}}/digest">raw</a>
+        </td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
+{{else}}
+<p class="nf-empty">No nights yet. Trigger one with <code>nf night trigger</code>.</p>
+{{end}}
+{{end}}

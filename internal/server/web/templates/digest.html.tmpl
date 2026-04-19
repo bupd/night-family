@@ -1,0 +1,14 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>Digest</h1>
+  <p class="nf-tagline">
+    <code>{{.NightID}}</code> &middot;
+    <a href="/api/v1/nights/{{.NightID}}/digest">raw markdown</a> &middot;
+    <a href="/digests">all digests</a>
+  </p>
+</section>
+
+<section class="nf-card" style="padding:1.5rem;">
+  <pre style="white-space:pre-wrap;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:0.9em;line-height:1.5;margin:0;">{{.Body}}</pre>
+</section>
+{{end}}
