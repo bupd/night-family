@@ -1,9 +1,9 @@
 # Binaries
 /bin/
 /dist/
-nf
-nfd
-nf-api
+/nf
+/nfd
+/nf-api
 
 # Go
 *.test
