@@ -87,9 +87,26 @@ Full design in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md).
 
 ## Status
 
-**Planning / scaffolding.** See [`docs/ROADMAP.md`](docs/ROADMAP.md) for phases.
-Nothing runs yet. This project is being built iteratively in public — expect
-a stream of small PRs.
+**v1 loop runs end-to-end.** The daemon, CLI, API, HTMX dashboard, mock +
+Claude providers, git orchestrator, and window scheduler all work. See
+[`docs/STATUS.md`](docs/STATUS.md) for what's shipped vs. pending and
+[`docs/ROADMAP.md`](docs/ROADMAP.md) for the phased plan.
+
+## Try it in 30 seconds
+
+```
+go install github.com/bupd/night-family/cmd/nfd@latest
+go install github.com/bupd/night-family/cmd/nf@latest
+
+# Run against the ephemeral in-memory DB, mock provider, no git side-effects.
+nfd --db :memory: &
+nf night trigger        # fires a full plan through the mock
+nf run list             # 12 runs, all succeeded
+open http://127.0.0.1:7337
+```
+
+For the real deal — a nightly window that opens PRs via Claude — see the
+recipe in [`docs/STATUS.md`](docs/STATUS.md).
 
 ## Docs
 
@@ -100,7 +117,8 @@ a stream of small PRs.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — phases & milestones
 - [`docs/IDEAS.md`](docs/IDEAS.md) — scratchpad of future ideas
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — ADRs as we go
+- [`docs/STATUS.md`](docs/STATUS.md) — what works today
 
 ## License
 
-TBD (likely Apache-2.0). See [`LICENSE`](LICENSE) once added.
+Apache-2.0 — see [`LICENSE`](LICENSE).
