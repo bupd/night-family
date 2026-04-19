@@ -15,8 +15,11 @@ import (
 	"syscall"
 	"time"
 
+	"strings"
+
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
+	"github.com/bupd/night-family/internal/gitops"
 	"github.com/bupd/night-family/internal/provider"
 	"github.com/bupd/night-family/internal/runner"
 	"github.com/bupd/night-family/internal/schedule"
@@ -28,6 +31,12 @@ func main() {
 	addr := flag.String("addr", "127.0.0.1:7337", "listen address")
 	logLevel := flag.String("log-level", "info", "log level (debug, info, warn, error)")
 	dbPath := flag.String("db", "", "path to SQLite database (default ~/.local/share/night-family/nf.db; use ':memory:' for ephemeral)")
+	repoRoot := flag.String("repo", "", "enable the git orchestrator against this local checkout (default disabled)")
+	baseBranch := flag.String("base-branch", "main", "base branch for opened PRs")
+	reviewersCSV := flag.String("reviewers", "coderabbitai,cubic-dev-ai", "comma-separated reviewers to tag on opened PRs")
+	signOff := flag.Bool("signoff", true, "add a DCO Signed-off-by trailer to commits")
+	skipPush := flag.Bool("skip-push", false, "orchestrator stops after local commit (does not push)")
+	skipPR := flag.Bool("skip-pr", false, "orchestrator stops after push (does not open a PR)")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -58,12 +67,39 @@ func main() {
 
 	prov := provider.NewMock()
 	logger.Info("provider", "name", prov.Name())
+
+	var orch *gitops.Orchestrator
+	if *repoRoot != "" {
+		var rev []string
+		for _, r := range strings.Split(*reviewersCSV, ",") {
+			if r = strings.TrimSpace(r); r != "" {
+				rev = append(rev, r)
+			}
+		}
+		orch, err = gitops.New(gitops.Options{
+			RepoRoot:   *repoRoot,
+			BaseBranch: *baseBranch,
+			Reviewers:  rev,
+			SignOff:    *signOff,
+			SkipPush:   *skipPush,
+			SkipPR:     *skipPR,
+		})
+		if err != nil {
+			fatal(logger, "gitops: %v", err)
+		}
+		logger.Info("gitops enabled", "repo", *repoRoot, "base", *baseBranch, "reviewers", rev)
+	} else {
+		logger.Info("gitops disabled (pass --repo to enable)")
+	}
+
 	run, err := runner.New(runner.Deps{
 		Family:   fam,
 		Duties:   duties,
 		Storage:  db,
 		Provider: prov,
 		Logger:   logger,
+		GitOps:   orch,
+		RepoRoot: *repoRoot,
 	})
 	if err != nil {
 		fatal(logger, "runner: %v", err)
