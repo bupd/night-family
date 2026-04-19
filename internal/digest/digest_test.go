@@ -24,24 +24,24 @@ func TestRenderIncludesExpectedSections(t *testing.T) {
 		Runs: []storage.Run{
 			{
 				ID: "run_1", Member: "jerry", Duty: "lint-fix",
-				Status: storage.RunSucceeded,
+				Status:    storage.RunSucceeded,
 				StartedAt: started,
-				Summary: &summary,
-				PRURL:   &prURL,
+				Summary:   &summary,
+				PRURL:     &prURL,
 			},
 			{
 				ID: "run_2", Member: "rick", Duty: "vuln-scan",
-				Status: storage.RunFailed,
+				Status:    storage.RunFailed,
 				StartedAt: started.Add(time.Minute),
-				Error: stringPtr("bang"),
+				Error:     stringPtr("bang"),
 			},
 		},
 		PRs: []storage.PR{
 			{
 				ID: "pr_1", URL: prURL, Member: "jerry", Duty: "lint-fix",
-				Title: stringPtr("docs: fix typo"),
+				Title:    stringPtr("docs: fix typo"),
 				OpenedAt: started,
-				State: storage.PROpen,
+				State:    storage.PROpen,
 			},
 		},
 	}

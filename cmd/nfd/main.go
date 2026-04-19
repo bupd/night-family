@@ -64,6 +64,7 @@ func main() {
 	claudeArgs := flag.String("claude-args", strings.Join(cfg.ClaudeArgs, " "), "extra space-separated args to pass to the claude binary")
 	codexBin := flag.String("codex-bin", "codex", "codex CLI binary path (used when --provider=codex)")
 	codexArgs := flag.String("codex-args", "", "extra space-separated args to pass to the codex binary")
+	digestDir := flag.String("digest-dir", "", "directory for per-night markdown digests (empty + XDG_STATE_HOME/UserHomeDir fallback)")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -144,14 +145,25 @@ func main() {
 		logger.Info("gitops disabled (pass --repo to enable)")
 	}
 
+	dd := *digestDir
+	if dd == "" {
+		if state := os.Getenv("XDG_STATE_HOME"); state != "" {
+			dd = state + "/night-family/digests"
+		} else if home, hErr := os.UserHomeDir(); hErr == nil {
+			dd = home + "/.local/share/night-family/digests"
+		}
+	}
+	logger.Info("digests", "dir", dd)
+
 	run, err := runner.New(runner.Deps{
-		Family:   fam,
-		Duties:   duties,
-		Storage:  db,
-		Provider: prov,
-		Logger:   logger,
-		GitOps:   orch,
-		RepoRoot: *repoRoot,
+		Family:    fam,
+		Duties:    duties,
+		Storage:   db,
+		Provider:  prov,
+		Logger:    logger,
+		GitOps:    orch,
+		RepoRoot:  *repoRoot,
+		DigestDir: dd,
 	})
 	if err != nil {
 		fatal(logger, "runner: %v", err)
