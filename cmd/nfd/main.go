@@ -39,6 +39,7 @@ func main() {
 	skipPush := flag.Bool("skip-push", false, "orchestrator stops after local commit (does not push)")
 	skipPR := flag.Bool("skip-pr", false, "orchestrator stops after push (does not open a PR)")
 	autoTrigger := flag.Bool("auto-trigger", false, "fire a night automatically when the schedule window opens")
+	familyDir := flag.String("family-dir", "", "directory of extra family YAMLs to overlay on the default roster (default: $XDG_CONFIG_HOME/night-family/family if present)")
 	providerName := flag.String("provider", "mock", "provider to dispatch through: 'mock' or 'claude'")
 	claudeBin := flag.String("claude-bin", "claude", "claude CLI binary path (used when --provider=claude)")
 	claudeArgs := flag.String("claude-args", "", "extra space-separated args to pass to the claude binary")
@@ -53,6 +54,28 @@ func main() {
 		fatal(logger, "load default family: %v", err)
 	}
 	fam.Seed(defaults)
+	dir := *familyDir
+	if dir == "" {
+		if cfg := os.Getenv("XDG_CONFIG_HOME"); cfg != "" {
+			dir = cfg + "/night-family/family"
+		} else if home, err := os.UserHomeDir(); err == nil {
+			dir = home + "/.config/night-family/family"
+		}
+	}
+	if dir != "" {
+		extras, errs := family.LoadDiskDir(dir)
+		for _, e := range errs {
+			logger.Warn("family-dir load issue", "dir", dir, "err", e)
+		}
+		for _, m := range extras {
+			if _, err := fam.Put(m); err != nil {
+				logger.Warn("family-dir member rejected", "name", m.Name, "err", err)
+			}
+		}
+		if len(extras) > 0 {
+			logger.Info("family-dir overlay applied", "dir", dir, "count", len(extras))
+		}
+	}
 	logger.Info("family seeded", "count", fam.Len())
 
 	duties := duty.NewBuiltinRegistry()
