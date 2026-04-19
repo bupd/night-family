@@ -1,0 +1,86 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://night-family.dev/schemas/family-member.schema.json",
+  "title": "FamilyMember",
+  "description": "Canonical schema for a night-family member YAML/JSON file.",
+  "type": "object",
+  "required": ["name", "role", "system_prompt"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$",
+      "description": "Unique kebab-case name. Also used in branch names."
+    },
+    "role": {
+      "type": "string",
+      "minLength": 1,
+      "description": "One-line human-readable role."
+    },
+    "system_prompt": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Full system prompt. Determines the agent's behaviour."
+    },
+    "duties": {
+      "type": "array",
+      "default": [],
+      "items": { "$ref": "#/$defs/DutyBinding" }
+    },
+    "risk_tolerance": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "default": "medium"
+    },
+    "max_prs_per_night": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 50,
+      "default": 2
+    },
+    "cost_tier": {
+      "type": "string",
+      "enum": ["low", "medium", "high"],
+      "default": "medium"
+    },
+    "reviewers": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 },
+      "default": []
+    },
+    "provider": { "$ref": "#/$defs/ProviderRef" }
+  },
+  "$defs": {
+    "DutyBinding": {
+      "type": "object",
+      "required": ["type", "interval"],
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "minLength": 1 },
+        "interval": {
+          "type": "string",
+          "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$",
+          "description": "Go-style duration, e.g. \"24h\", \"72h\"."
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["low", "medium", "high"],
+          "default": "medium"
+        },
+        "args": { "type": "object", "additionalProperties": true }
+      }
+    },
+    "ProviderRef": {
+      "type": "object",
+      "required": ["name"],
+      "additionalProperties": false,
+      "properties": {
+        "name": {
+          "type": "string",
+          "examples": ["claude", "codex", "copilot"]
+        },
+        "model": { "type": "string" }
+      }
+    }
+  }
+}
