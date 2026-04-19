@@ -23,6 +23,7 @@ Usage:
 Commands:
   version    Print build metadata
   family     Inspect the family roster (list|show)
+  duty       Inspect the duty catalogue (list|show)
   help       Show this help
 
 Environment:
@@ -41,6 +42,8 @@ func main() {
 		versionCmd(os.Args[2:])
 	case "family":
 		familyCmd(os.Args[2:])
+	case "duty":
+		dutyCmd(os.Args[2:])
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
