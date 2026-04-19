@@ -30,6 +30,7 @@ tasks:
     sources:
       - '**/*.go'
       - 'internal/server/web/**/*'
+      - 'internal/server/apiassets/**/*'
       - 'go.mod'
       - 'go.sum'
     generates:
