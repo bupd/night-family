@@ -19,6 +19,7 @@ import (
 
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
+	"github.com/bupd/night-family/internal/schedule"
 	"github.com/bupd/night-family/internal/version"
 )
 
@@ -43,6 +44,12 @@ type Config struct {
 	// Duties is the duty registry the /duties* handlers read from. When
 	// nil, those routes are not registered.
 	Duties *duty.Registry
+	// Schedule is the authoritative schedule the /schedule* handlers
+	// read from. When nil, those routes are not registered.
+	Schedule *schedule.Schedule
+	// Clock, when set, replaces time.Now() in handlers — used in tests
+	// to pin the "current" time.
+	Clock schedule.Clock
 }
 
 // Server is the running HTTP server.
@@ -109,6 +116,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /docs", s.serveDocs)
 	s.familyRoutes(mux)
 	s.dutiesRoutes(mux)
+	s.scheduleRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
