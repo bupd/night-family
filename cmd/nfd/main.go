@@ -59,9 +59,11 @@ func main() {
 	skipPR := flag.Bool("skip-pr", cfg.SkipPR, "orchestrator stops after push (does not open a PR)")
 	autoTrigger := flag.Bool("auto-trigger", cfg.AutoTrigger, "fire a night automatically when the schedule window opens")
 	familyDir := flag.String("family-dir", cfg.FamilyDir, "directory of extra family YAMLs to overlay on the default roster (default: $XDG_CONFIG_HOME/night-family/family if present)")
-	providerName := flag.String("provider", nonEmpty(cfg.Provider, "mock"), "provider to dispatch through: 'mock' or 'claude'")
+	providerName := flag.String("provider", nonEmpty(cfg.Provider, "mock"), "provider to dispatch through: 'mock', 'claude', or 'codex'")
 	claudeBin := flag.String("claude-bin", nonEmpty(cfg.ClaudeBin, "claude"), "claude CLI binary path (used when --provider=claude)")
 	claudeArgs := flag.String("claude-args", strings.Join(cfg.ClaudeArgs, " "), "extra space-separated args to pass to the claude binary")
+	codexBin := flag.String("codex-bin", "codex", "codex CLI binary path (used when --provider=codex)")
+	codexArgs := flag.String("codex-args", "", "extra space-separated args to pass to the codex binary")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -112,7 +114,7 @@ func main() {
 	}
 	defer db.Close()
 
-	prov, err := buildProvider(*providerName, *claudeBin, *claudeArgs)
+	prov, err := buildProvider(*providerName, *claudeBin, *claudeArgs, *codexBin, *codexArgs)
 	if err != nil {
 		fatal(logger, "provider: %v", err)
 	}
@@ -273,21 +275,30 @@ func joinCSV(xs []string) string {
 
 // buildProvider resolves the --provider flag into a provider.Provider
 // instance. Unknown names fail loudly so users catch typos at boot.
-func buildProvider(name, bin, extraArgs string) (provider.Provider, error) {
+func buildProvider(name, claudeBin, claudeArgs, codexBin, codexArgs string) (provider.Provider, error) {
 	switch name {
 	case "", "mock":
 		return provider.NewMock(), nil
 	case "claude":
 		c := provider.NewClaude()
-		if bin != "" {
-			c.Bin = bin
+		if claudeBin != "" {
+			c.Bin = claudeBin
 		}
-		if extraArgs != "" {
-			c.ExtraArgs = strings.Fields(extraArgs)
+		if claudeArgs != "" {
+			c.ExtraArgs = strings.Fields(claudeArgs)
+		}
+		return c, nil
+	case "codex":
+		c := provider.NewCodex()
+		if codexBin != "" {
+			c.Bin = codexBin
+		}
+		if codexArgs != "" {
+			c.ExtraArgs = strings.Fields(codexArgs)
 		}
 		return c, nil
 	default:
-		return nil, fmt.Errorf("unknown provider %q (valid: mock, claude)", name)
+		return nil, fmt.Errorf("unknown provider %q (valid: mock, claude, codex)", name)
 	}
 }
 
