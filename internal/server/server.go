@@ -196,13 +196,13 @@ func (s *Server) renderPage(w http.ResponseWriter, page string, data any) {
 // `content` block isn't shared across pages.
 func parsePages(web fs.FS) (map[string]*template.Template, error) {
 	pages := map[string]string{
-		"index":  "templates/index.html.tmpl",
-		"docs":   "templates/docs.html.tmpl",
-		"family": "templates/family.html.tmpl",
-		"duties": "templates/duties.html.tmpl",
-		"plan":   "templates/plan.html.tmpl",
-		"runs":   "templates/runs.html.tmpl",
-		"prs":    "templates/prs.html.tmpl",
+		"index":   "templates/index.html.tmpl",
+		"docs":    "templates/docs.html.tmpl",
+		"family":  "templates/family.html.tmpl",
+		"duties":  "templates/duties.html.tmpl",
+		"plan":    "templates/plan.html.tmpl",
+		"runs":    "templates/runs.html.tmpl",
+		"prs":     "templates/prs.html.tmpl",
 		"nights":  "templates/nights.html.tmpl",
 		"digests": "templates/digests.html.tmpl",
 		"digest":  "templates/digest.html.tmpl",
