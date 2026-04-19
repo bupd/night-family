@@ -1,0 +1,58 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    name: vet / test / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+          check-latest: true
+          cache: true
+
+      - name: gofmt
+        run: |
+          out=$(gofmt -l .)
+          if [ -n "$out" ]; then
+            echo "::error::gofmt would modify the following files:"
+            echo "$out"
+            exit 1
+          fi
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: go test
+        run: go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+
+      - name: go build
+        run: |
+          go build -o /tmp/nf ./cmd/nf
+          go build -o /tmp/nfd ./cmd/nfd
+
+      - name: smoke test nfd
+        run: |
+          /tmp/nfd -addr 127.0.0.1:17337 &
+          DPID=$!
+          sleep 1
+          curl -fsS http://127.0.0.1:17337/healthz > /dev/null
+          curl -fsS http://127.0.0.1:17337/version > /dev/null
+          curl -fsS http://127.0.0.1:17337/ > /dev/null
+          kill $DPID
