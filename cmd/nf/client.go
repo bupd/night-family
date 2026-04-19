@@ -26,12 +26,24 @@ func daemonURL() string {
 // apiPost sends a JSON POST and decodes the response. Non-2xx is
 // surfaced as an error.
 func apiPost(path string, body []byte, out any) error {
+	return apiJSON(http.MethodPost, path, body, out)
+}
+
+// apiJSON is the general-purpose JSON roundtripper behind apiPost +
+// PUT + DELETE. Passing body=nil sends no body (useful for DELETE).
+func apiJSON(method, path string, body []byte, out any) error {
 	c := &http.Client{Timeout: 3 * time.Minute}
-	req, err := http.NewRequest(http.MethodPost, daemonURL()+path, bytes.NewReader(body))
+	var r io.Reader
+	if body != nil {
+		r = bytes.NewReader(body)
+	}
+	req, err := http.NewRequest(method, daemonURL()+path, r)
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Content-Type", "application/json")
+	if body != nil {
+		req.Header.Set("Content-Type", "application/json")
+	}
 	req.Header.Set("Accept", "application/json")
 	resp, err := c.Do(req)
 	if err != nil {
@@ -43,6 +55,9 @@ func apiPost(path string, body []byte, out any) error {
 		return fmt.Errorf("daemon returned %s: %s", resp.Status, string(b))
 	}
 	if out == nil {
+		return nil
+	}
+	if resp.StatusCode == http.StatusNoContent {
 		return nil
 	}
 	return json.NewDecoder(resp.Body).Decode(out)
