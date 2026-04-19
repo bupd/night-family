@@ -19,11 +19,13 @@ import (
 	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/schedule"
 	"github.com/bupd/night-family/internal/server"
+	"github.com/bupd/night-family/internal/storage"
 )
 
 func main() {
 	addr := flag.String("addr", "127.0.0.1:7337", "listen address")
 	logLevel := flag.String("log-level", "info", "log level (debug, info, warn, error)")
+	dbPath := flag.String("db", "", "path to SQLite database (default ~/.local/share/night-family/nf.db; use ':memory:' for ephemeral)")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -46,12 +48,19 @@ func main() {
 	}
 	logger.Info("schedule", "window", sched.WindowStart+"-"+sched.WindowEnd, "tz", sched.TimeZone)
 
+	db, err := openStorage(context.Background(), *dbPath, logger)
+	if err != nil {
+		fatal(logger, "open storage: %v", err)
+	}
+	defer db.Close()
+
 	srv, err := server.New(server.Config{
 		Addr:     *addr,
 		Logger:   logger,
 		Family:   fam,
 		Duties:   duties,
 		Schedule: &sched,
+		Storage:  db,
 	})
 	if err != nil {
 		fatal(logger, "server init: %v", err)
@@ -85,6 +94,29 @@ func newLogger(level string) *slog.Logger {
 		lvl = slog.LevelInfo
 	}
 	return slog.New(slog.NewTextHandler(os.Stderr, &slog.HandlerOptions{Level: lvl}))
+}
+
+// openStorage resolves the DB path (falling back to the XDG state
+// directory under night-family/nf.db) and calls storage.Open.
+func openStorage(ctx context.Context, explicit string, logger *slog.Logger) (*storage.DB, error) {
+	dsn := explicit
+	if dsn == "" {
+		stateDir := os.Getenv("XDG_STATE_HOME")
+		if stateDir == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return nil, err
+			}
+			stateDir = home + "/.local/share"
+		}
+		dir := stateDir + "/night-family"
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			return nil, err
+		}
+		dsn = "file:" + dir + "/nf.db"
+	}
+	logger.Info("storage", "dsn", dsn)
+	return storage.Open(ctx, dsn)
 }
 
 func fatal(logger *slog.Logger, format string, args ...any) {
