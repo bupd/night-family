@@ -1,0 +1,30 @@
+{{define "base"}}<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{.Title}}</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/htmx.min.js" defer></script>
+</head>
+<body>
+  <header class="nf-header">
+    <a href="/" class="nf-brand">night-family</a>
+    <nav class="nf-nav">
+      <a href="/">Dashboard</a>
+      <a href="/family">Family</a>
+      <a href="/duties">Duties</a>
+      <a href="/runs">Runs</a>
+      <a href="/settings">Settings</a>
+    </nav>
+    <span class="nf-ver">{{.Version}}</span>
+  </header>
+  <main class="nf-main">
+    {{block "content" .}}{{end}}
+  </main>
+  <footer class="nf-footer">
+    <small>wubba lubba dub dub</small>
+  </footer>
+</body>
+</html>
+{{end}}

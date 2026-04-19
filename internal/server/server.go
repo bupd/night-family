@@ -1,0 +1,161 @@
+// Package server wires up the HTTP surface served by nfd: the JSON API
+// under /api/v1, the health endpoints, and the HTMX-rendered UI.
+//
+// In this skeleton only /healthz, /readyz, /version, and a minimal / page
+// are wired. Subsequent iterations will mount the API and UI handlers from
+// their own packages.
+package server
+
+import (
+	"context"
+	"embed"
+	"encoding/json"
+	"errors"
+	"html/template"
+	"io/fs"
+	"log/slog"
+	"net/http"
+	"time"
+
+	"github.com/bupd/night-family/internal/version"
+)
+
+//go:embed all:web
+var webFS embed.FS
+
+// WebFS returns the embedded UI assets so tests and tools can inspect them.
+func WebFS() fs.FS {
+	sub, _ := fs.Sub(webFS, "web")
+	return sub
+}
+
+// Config controls how the server binds and renders.
+type Config struct {
+	// Addr is the listen address, e.g. "127.0.0.1:7337".
+	Addr string
+	// Logger used by handlers. Must be non-nil.
+	Logger *slog.Logger
+}
+
+// Server is the running HTTP server.
+type Server struct {
+	cfg Config
+	srv *http.Server
+	tpl *template.Template
+	web fs.FS
+}
+
+// New constructs a Server. Templates are parsed eagerly; if parsing fails
+// the caller gets an error instead of a half-initialised server.
+func New(cfg Config) (*Server, error) {
+	if cfg.Logger == nil {
+		return nil, errors.New("server: cfg.Logger is required")
+	}
+	if cfg.Addr == "" {
+		cfg.Addr = "127.0.0.1:7337"
+	}
+	web := WebFS()
+	tpl, err := template.ParseFS(web, "templates/*.html.tmpl")
+	if err != nil {
+		return nil, err
+	}
+	s := &Server{cfg: cfg, tpl: tpl, web: web}
+	s.srv = &http.Server{
+		Addr:              cfg.Addr,
+		Handler:           s.routes(),
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+	return s, nil
+}
+
+// Addr returns the configured listen address.
+func (s *Server) Addr() string { return s.cfg.Addr }
+
+// ListenAndServe starts the server. It blocks until the server stops.
+func (s *Server) ListenAndServe() error {
+	s.cfg.Logger.Info("server listening", "addr", s.cfg.Addr)
+	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+		return err
+	}
+	return nil
+}
+
+// Shutdown gracefully drains the server.
+func (s *Server) Shutdown(ctx context.Context) error {
+	return s.srv.Shutdown(ctx)
+}
+
+func (s *Server) routes() http.Handler {
+	mux := http.NewServeMux()
+
+	mux.HandleFunc("GET /healthz", s.healthz)
+	mux.HandleFunc("GET /readyz", s.readyz)
+	mux.HandleFunc("GET /version", s.versionJSON)
+	mux.HandleFunc("GET /", s.index)
+
+	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
+		mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticSub)))
+	}
+
+	return logMiddleware(s.cfg.Logger, mux)
+}
+
+func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+}
+
+func (s *Server) readyz(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, map[string]string{"status": "ready"})
+}
+
+func (s *Server) versionJSON(w http.ResponseWriter, _ *http.Request) {
+	writeJSON(w, http.StatusOK, version.Current())
+}
+
+func (s *Server) index(w http.ResponseWriter, r *http.Request) {
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
+	data := struct {
+		Title   string
+		Version string
+	}{
+		Title:   "night-family",
+		Version: version.Current().Version,
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := s.tpl.ExecuteTemplate(w, "index.html.tmpl", data); err != nil {
+		s.cfg.Logger.Error("render index", "err", err)
+	}
+}
+
+func writeJSON(w http.ResponseWriter, status int, v any) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(status)
+	_ = json.NewEncoder(w).Encode(v)
+}
+
+func logMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		rw := &statusRecorder{ResponseWriter: w, status: 200}
+		next.ServeHTTP(rw, r)
+		logger.Info("http",
+			"method", r.Method,
+			"path", r.URL.Path,
+			"status", rw.status,
+			"dur", time.Since(start).String(),
+		)
+	})
+}
+
+type statusRecorder struct {
+	http.ResponseWriter
+	status int
+}
+
+func (r *statusRecorder) WriteHeader(code int) {
+	r.status = code
+	r.ResponseWriter.WriteHeader(code)
+}
