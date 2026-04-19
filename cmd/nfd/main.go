@@ -17,6 +17,7 @@ import (
 
 	"strings"
 
+	"github.com/bupd/night-family/internal/config"
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/gitops"
@@ -29,20 +30,38 @@ import (
 )
 
 func main() {
-	addr := flag.String("addr", "127.0.0.1:7337", "listen address")
-	logLevel := flag.String("log-level", "info", "log level (debug, info, warn, error)")
-	dbPath := flag.String("db", "", "path to SQLite database (default ~/.local/share/night-family/nf.db; use ':memory:' for ephemeral)")
-	repoRoot := flag.String("repo", "", "enable the git orchestrator against this local checkout (default disabled)")
-	baseBranch := flag.String("base-branch", "main", "base branch for opened PRs")
-	reviewersCSV := flag.String("reviewers", "coderabbitai,cubic-dev-ai", "comma-separated reviewers to tag on opened PRs")
-	signOff := flag.Bool("signoff", true, "add a DCO Signed-off-by trailer to commits")
-	skipPush := flag.Bool("skip-push", false, "orchestrator stops after local commit (does not push)")
-	skipPR := flag.Bool("skip-pr", false, "orchestrator stops after push (does not open a PR)")
-	autoTrigger := flag.Bool("auto-trigger", false, "fire a night automatically when the schedule window opens")
-	familyDir := flag.String("family-dir", "", "directory of extra family YAMLs to overlay on the default roster (default: $XDG_CONFIG_HOME/night-family/family if present)")
-	providerName := flag.String("provider", "mock", "provider to dispatch through: 'mock' or 'claude'")
-	claudeBin := flag.String("claude-bin", "claude", "claude CLI binary path (used when --provider=claude)")
-	claudeArgs := flag.String("claude-args", "", "extra space-separated args to pass to the claude binary")
+	// Peek at the command line for an explicit --config BEFORE
+	// declaring the main flag set. That way the config file's values
+	// can seed the defaults — and any flag the operator passes still
+	// wins on conflict (flag.Parse is the last word).
+	explicitCfg := peekConfigFlag(os.Args[1:])
+	configPath := explicitCfg
+	if configPath == "" {
+		configPath = config.DefaultPath()
+	}
+	cfg, cerr := config.Load(configPath)
+	if cerr != nil {
+		fmt.Fprintln(os.Stderr, "nfd: config load:", cerr)
+		os.Exit(2)
+	}
+
+	_ = flag.String("config", configPath, "path to the nfd config file (YAML; optional)")
+
+	// Apply config values, falling back to the built-in defaults.
+	addr := flag.String("addr", nonEmpty(cfg.Addr, "127.0.0.1:7337"), "listen address")
+	logLevel := flag.String("log-level", nonEmpty(cfg.LogLevel, "info"), "log level (debug, info, warn, error)")
+	dbPath := flag.String("db", cfg.DB, "path to SQLite database (default ~/.local/share/night-family/nf.db; use ':memory:' for ephemeral)")
+	repoRoot := flag.String("repo", cfg.Repo, "enable the git orchestrator against this local checkout (default disabled)")
+	baseBranch := flag.String("base-branch", nonEmpty(cfg.BaseBranch, "main"), "base branch for opened PRs")
+	reviewersCSV := flag.String("reviewers", nonEmpty(joinCSV(cfg.Reviewers), "coderabbitai,cubic-dev-ai"), "comma-separated reviewers to tag on opened PRs")
+	signOff := flag.Bool("signoff", cfg.SignOff == nil || *cfg.SignOff, "add a DCO Signed-off-by trailer to commits")
+	skipPush := flag.Bool("skip-push", cfg.SkipPush, "orchestrator stops after local commit (does not push)")
+	skipPR := flag.Bool("skip-pr", cfg.SkipPR, "orchestrator stops after push (does not open a PR)")
+	autoTrigger := flag.Bool("auto-trigger", cfg.AutoTrigger, "fire a night automatically when the schedule window opens")
+	familyDir := flag.String("family-dir", cfg.FamilyDir, "directory of extra family YAMLs to overlay on the default roster (default: $XDG_CONFIG_HOME/night-family/family if present)")
+	providerName := flag.String("provider", nonEmpty(cfg.Provider, "mock"), "provider to dispatch through: 'mock' or 'claude'")
+	claudeBin := flag.String("claude-bin", nonEmpty(cfg.ClaudeBin, "claude"), "claude CLI binary path (used when --provider=claude)")
+	claudeArgs := flag.String("claude-args", strings.Join(cfg.ClaudeArgs, " "), "extra space-separated args to pass to the claude binary")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -214,6 +233,42 @@ func openStorage(ctx context.Context, explicit string, logger *slog.Logger) (*st
 	}
 	logger.Info("storage", "dsn", dsn)
 	return storage.Open(ctx, dsn)
+}
+
+// peekConfigFlag scans args for a --config / -config value without
+// defining a flag set. Supports both "--config=path" and "--config
+// path" forms.
+func peekConfigFlag(args []string) string {
+	for i, a := range args {
+		switch {
+		case a == "--config" || a == "-config":
+			if i+1 < len(args) {
+				return args[i+1]
+			}
+		case strings.HasPrefix(a, "--config="):
+			return strings.TrimPrefix(a, "--config=")
+		case strings.HasPrefix(a, "-config="):
+			return strings.TrimPrefix(a, "-config=")
+		}
+	}
+	return ""
+}
+
+// nonEmpty returns the first argument if non-empty, otherwise fallback.
+func nonEmpty(v, fallback string) string {
+	if v != "" {
+		return v
+	}
+	return fallback
+}
+
+// joinCSV joins a slice of reviewer names with commas, returning ""
+// when the slice is empty.
+func joinCSV(xs []string) string {
+	if len(xs) == 0 {
+		return ""
+	}
+	return strings.Join(xs, ",")
 }
 
 // buildProvider resolves the --provider flag into a provider.Provider
