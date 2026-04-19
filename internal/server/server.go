@@ -39,10 +39,11 @@ type Config struct {
 
 // Server is the running HTTP server.
 type Server struct {
-	cfg Config
-	srv *http.Server
-	tpl *template.Template
-	web fs.FS
+	cfg   Config
+	srv   *http.Server
+	pages map[string]*template.Template
+	web   fs.FS
+	spec  *specBundle
 }
 
 // New constructs a Server. Templates are parsed eagerly; if parsing fails
@@ -55,11 +56,15 @@ func New(cfg Config) (*Server, error) {
 		cfg.Addr = "127.0.0.1:7337"
 	}
 	web := WebFS()
-	tpl, err := template.ParseFS(web, "templates/*.html.tmpl")
+	pages, err := parsePages(web)
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{cfg: cfg, tpl: tpl, web: web}
+	spec, err := loadSpec()
+	if err != nil {
+		return nil, err
+	}
+	s := &Server{cfg: cfg, pages: pages, web: web, spec: spec}
 	s.srv = &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           s.routes(),
@@ -91,6 +96,9 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /healthz", s.healthz)
 	mux.HandleFunc("GET /readyz", s.readyz)
 	mux.HandleFunc("GET /version", s.versionJSON)
+	mux.HandleFunc("GET /openapi.yaml", s.serveOpenAPIYAML)
+	mux.HandleFunc("GET /openapi.json", s.serveOpenAPIJSON)
+	mux.HandleFunc("GET /docs", s.serveDocs)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
@@ -124,10 +132,41 @@ func (s *Server) index(w http.ResponseWriter, r *http.Request) {
 		Title:   "night-family",
 		Version: version.Current().Version,
 	}
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	if err := s.tpl.ExecuteTemplate(w, "index.html.tmpl", data); err != nil {
-		s.cfg.Logger.Error("render index", "err", err)
+	s.renderPage(w, "index", data)
+}
+
+// renderPage executes a named page's template set. Each page is a fresh
+// template cloned at startup so sibling pages don't accidentally
+// override each other's `{{define "content"}}` blocks.
+func (s *Server) renderPage(w http.ResponseWriter, page string, data any) {
+	tpl, ok := s.pages[page]
+	if !ok {
+		http.Error(w, "template not found: "+page, http.StatusInternalServerError)
+		return
 	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	if err := tpl.ExecuteTemplate(w, "base", data); err != nil {
+		s.cfg.Logger.Error("render page", "page", page, "err", err)
+	}
+}
+
+// parsePages returns one fully-populated template per page. Each page
+// gets base.html.tmpl plus its own file parsed in isolation so the
+// `content` block isn't shared across pages.
+func parsePages(web fs.FS) (map[string]*template.Template, error) {
+	pages := map[string]string{
+		"index": "templates/index.html.tmpl",
+		"docs":  "templates/docs.html.tmpl",
+	}
+	out := make(map[string]*template.Template, len(pages))
+	for name, path := range pages {
+		tpl, err := template.New(name).ParseFS(web, "templates/base.html.tmpl", path)
+		if err != nil {
+			return nil, err
+		}
+		out[name] = tpl
+	}
+	return out, nil
 }
 
 func writeJSON(w http.ResponseWriter, status int, v any) {

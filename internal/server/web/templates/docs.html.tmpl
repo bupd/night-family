@@ -1,0 +1,32 @@
+{{template "base" .}}
+
+{{define "content"}}
+<section class="nf-hero">
+  <h1>API docs</h1>
+  <p class="nf-tagline">
+    Interactive OpenAPI 3.1 reference for the night-family daemon. The raw
+    spec is available at
+    <a href="/openapi.yaml"><code>/openapi.yaml</code></a> and
+    <a href="/openapi.json"><code>/openapi.json</code></a>.
+  </p>
+</section>
+
+<section class="nf-card nf-docs">
+  <div id="swagger-ui"></div>
+</section>
+
+<link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui.css">
+<script src="https://unpkg.com/swagger-ui-dist@5.17.14/swagger-ui-bundle.js" crossorigin></script>
+<script>
+  window.addEventListener('DOMContentLoaded', function () {
+    window.ui = SwaggerUIBundle({
+      url: '/openapi.yaml',
+      dom_id: '#swagger-ui',
+      deepLinking: true,
+      layout: 'BaseLayout',
+      docExpansion: 'list',
+      defaultModelsExpandDepth: -1,
+    });
+  });
+</script>
+{{end}}
