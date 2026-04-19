@@ -1,11 +1,11 @@
 // Package e2e exercises the full nfd binary via a child process.
 //
 // What's tested:
-//   * binary builds (`go build` happens in TestMain).
-//   * nfd boots with an in-memory DB, serves /healthz, /readyz, /version.
-//   * POST /api/v1/nights/trigger against the default roster with the
+//   - binary builds (`go build` happens in TestMain).
+//   - nfd boots with an in-memory DB, serves /healthz, /readyz, /version.
+//   - POST /api/v1/nights/trigger against the default roster with the
 //     mock provider produces 12 runs and records the Night.
-//   * /metrics reflects the new counts.
+//   - /metrics reflects the new counts.
 //
 // Skipped automatically when `go` isn't on PATH (shouldn't happen in
 // CI but saves maintainers running from a stripped container).
