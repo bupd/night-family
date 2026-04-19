@@ -24,6 +24,7 @@ Commands:
   version    Print build metadata
   family     Inspect the family roster (list|show)
   duty       Inspect the duty catalogue (list|show)
+  night      Inspect or trigger nightly plans (preview)
   help       Show this help
 
 Environment:
@@ -44,6 +45,8 @@ func main() {
 		familyCmd(os.Args[2:])
 	case "duty":
 		dutyCmd(os.Args[2:])
+	case "night":
+		nightCmd(os.Args[2:])
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
