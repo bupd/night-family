@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -20,6 +21,31 @@ func daemonURL() string {
 		return u
 	}
 	return defaultDaemonURL
+}
+
+// apiPost sends a JSON POST and decodes the response. Non-2xx is
+// surfaced as an error.
+func apiPost(path string, body []byte, out any) error {
+	c := &http.Client{Timeout: 3 * time.Minute}
+	req, err := http.NewRequest(http.MethodPost, daemonURL()+path, bytes.NewReader(body))
+	if err != nil {
+		return err
+	}
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Accept", "application/json")
+	resp, err := c.Do(req)
+	if err != nil {
+		return fmt.Errorf("reach daemon at %s: %w", daemonURL(), err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode/100 != 2 {
+		b, _ := io.ReadAll(io.LimitReader(resp.Body, 1024))
+		return fmt.Errorf("daemon returned %s: %s", resp.Status, string(b))
+	}
+	if out == nil {
+		return nil
+	}
+	return json.NewDecoder(resp.Body).Decode(out)
 }
 
 // apiGet fetches and decodes a JSON document from the daemon. Any

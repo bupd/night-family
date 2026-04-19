@@ -9,11 +9,12 @@ import (
 	"text/tabwriter"
 )
 
-const runUsage = `nf run — inspect recorded runs
+const runUsage = `nf run — inspect and dispatch runs
 
 Usage:
   nf run list [--member X] [--duty Y] [--status Z] [--limit N] [--json]
   nf run show <id>
+  nf run start --member X --duty Y        Dispatch a new run against the daemon's provider
 `
 
 type runRecord struct {
@@ -42,6 +43,8 @@ func runCmd(args []string) {
 		runList(args[1:])
 	case "show":
 		runShow(args[1:])
+	case "start":
+		runStart(args[1:])
 	case "help", "-h", "--help":
 		fmt.Print(runUsage)
 	default:
@@ -104,6 +107,30 @@ func runList(args []string) {
 			r.ID, r.Member, r.Duty, r.Status, r.StartedAt, pr)
 	}
 	_ = tw.Flush()
+}
+
+func runStart(args []string) {
+	fs := flag.NewFlagSet("run start", flag.ExitOnError)
+	member := fs.String("member", "", "family member name (required)")
+	duty := fs.String("duty", "", "duty type (required)")
+	_ = fs.Parse(args)
+	if *member == "" || *duty == "" {
+		fmt.Fprintln(os.Stderr, "nf run start: --member and --duty are required")
+		os.Exit(2)
+	}
+	body, err := json.Marshal(map[string]any{"member": *member, "duty": *duty})
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+		os.Exit(1)
+	}
+	var run map[string]any
+	if err := apiPost("/api/v1/runs", body, &run); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+		os.Exit(1)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(run)
 }
 
 func runShow(args []string) {
