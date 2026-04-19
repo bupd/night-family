@@ -126,6 +126,7 @@ func (s *Server) routes() http.Handler {
 	s.scheduleRoutes(mux)
 	s.plannerRoutes(mux)
 	s.runsRoutes(mux)
+	s.nightsRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
