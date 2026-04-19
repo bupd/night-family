@@ -17,6 +17,7 @@ import (
 
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
+	"github.com/bupd/night-family/internal/schedule"
 	"github.com/bupd/night-family/internal/server"
 )
 
@@ -39,11 +40,18 @@ func main() {
 	duties := duty.NewBuiltinRegistry()
 	logger.Info("duties loaded", "count", duties.Len())
 
+	sched := schedule.Default()
+	if err := sched.Validate(); err != nil {
+		fatal(logger, "default schedule invalid: %v", err)
+	}
+	logger.Info("schedule", "window", sched.WindowStart+"-"+sched.WindowEnd, "tz", sched.TimeZone)
+
 	srv, err := server.New(server.Config{
-		Addr:   *addr,
-		Logger: logger,
-		Family: fam,
-		Duties: duties,
+		Addr:     *addr,
+		Logger:   logger,
+		Family:   fam,
+		Duties:   duties,
+		Schedule: &sched,
 	})
 	if err != nil {
 		fatal(logger, "server init: %v", err)
