@@ -1,0 +1,1004 @@
+openapi: 3.1.0
+info:
+  title: night-family API
+  summary: REST surface for the night-family daemon
+  description: |
+    night-family is a crew of AI agents that run on a nightly window and open
+    small PRs while you sleep. This spec describes the **v1** HTTP surface
+    exposed by `nfd` — the daemon the `nf` CLI and the built-in HTMX UI both
+    talk to.
+
+    The spec is authoritative: handlers validate requests against it at
+    runtime. Breaking changes bump the `v1` prefix to `v2`; additive changes
+    do not.
+
+    Conventions:
+    - all timestamps are RFC 3339 UTC
+    - all durations are [Go-style](https://pkg.go.dev/time#ParseDuration)
+      strings (`"24h"`, `"30m"`, `"15m30s"`)
+    - all IDs are ULIDs prefixed with the kind (`run_`, `night_`, `pr_`, …)
+    - errors follow [RFC 9457](https://datatracker.ietf.org/doc/html/rfc9457)
+      Problem-Details.
+  version: "1.0.0-alpha.1"
+  contact:
+    name: night-family
+    url: https://github.com/bupd/night-family
+  license:
+    name: Apache-2.0
+    identifier: Apache-2.0
+
+servers:
+  - url: http://127.0.0.1:7337/api/v1
+    description: Local daemon (default)
+  - url: http://{host}:{port}/api/v1
+    description: Configurable host/port
+    variables:
+      host:
+        default: 127.0.0.1
+      port:
+        default: "7337"
+
+tags:
+  - name: health
+    description: Liveness and readiness probes, plus the build-info endpoint.
+  - name: family
+    description: Family members — the AI personas that own duties.
+  - name: duties
+    description: The catalogue of things a family member knows how to do.
+  - name: runs
+    description: Execution records — one per dispatched duty.
+  - name: nights
+    description: Scheduled windows; each night contains many runs.
+  - name: budget
+    description: Token accounting so we don't blow the session.
+  - name: schedule
+    description: The nightly window and cron.
+  - name: prs
+    description: Pull requests opened by the family.
+  - name: config
+    description: Daemon-wide configuration.
+
+security:
+  - bearerAuth: []
+  - {}
+
+paths:
+  /healthz:
+    get:
+      tags: [health]
+      summary: Liveness probe
+      operationId: getHealthz
+      security: []
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Status" }
+
+  /readyz:
+    get:
+      tags: [health]
+      summary: Readiness probe
+      operationId: getReadyz
+      security: []
+      responses:
+        "200":
+          description: ready
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Status" }
+        "503":
+          description: not ready
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /version:
+    get:
+      tags: [health]
+      summary: Build metadata
+      operationId: getVersion
+      security: []
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/VersionInfo" }
+
+  /family:
+    get:
+      tags: [family]
+      summary: List family members
+      operationId: listFamily
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/FamilyMember" }
+    post:
+      tags: [family]
+      summary: Create a family member
+      operationId: createFamilyMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamilyMemberInput" }
+      responses:
+        "201":
+          description: created
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyMember" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "409": { $ref: "#/components/responses/Conflict" }
+
+  /family/{name}:
+    parameters:
+      - $ref: "#/components/parameters/MemberName"
+    get:
+      tags: [family]
+      summary: Get a family member
+      operationId: getFamilyMember
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyMember" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    put:
+      tags: [family]
+      summary: Replace a family member
+      operationId: replaceFamilyMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamilyMemberInput" }
+      responses:
+        "200":
+          description: updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/FamilyMember" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+        "404": { $ref: "#/components/responses/NotFound" }
+    delete:
+      tags: [family]
+      summary: Delete a family member
+      operationId: deleteFamilyMember
+      responses:
+        "204": { description: deleted }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /family/validate:
+    post:
+      tags: [family]
+      summary: Validate a family-member definition without persisting
+      operationId: validateFamilyMember
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/FamilyMemberInput" }
+      responses:
+        "200":
+          description: validation result
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ValidationResult" }
+
+  /duties:
+    get:
+      tags: [duties]
+      summary: List known duty types
+      operationId: listDuties
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/DutyInfo" }
+
+  /duties/{type}:
+    parameters:
+      - $ref: "#/components/parameters/DutyType"
+    get:
+      tags: [duties]
+      summary: Get a duty type's metadata
+      operationId: getDuty
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/DutyInfo" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /duties/{type}/plan:
+    parameters:
+      - $ref: "#/components/parameters/DutyType"
+    post:
+      tags: [duties]
+      summary: Dry-run a duty's planner
+      operationId: planDuty
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/PlanRequest" }
+      responses:
+        "200":
+          description: plan
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Plan" }
+
+  /runs:
+    get:
+      tags: [runs]
+      summary: List runs
+      operationId: listRuns
+      parameters:
+        - $ref: "#/components/parameters/FilterMember"
+        - $ref: "#/components/parameters/FilterDuty"
+        - $ref: "#/components/parameters/FilterStatus"
+        - $ref: "#/components/parameters/FilterSince"
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PagedRuns" }
+    post:
+      tags: [runs]
+      summary: Manually trigger a run
+      operationId: createRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/RunRequest" }
+      responses:
+        "202":
+          description: queued
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /runs/{id}:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    get:
+      tags: [runs]
+      summary: Get a run
+      operationId: getRun
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /runs/{id}/logs:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    get:
+      tags: [runs]
+      summary: Stream (or page) a run's logs
+      operationId: getRunLogs
+      parameters:
+        - in: query
+          name: tail
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 10000
+          description: If set, return only the last N lines (and don't stream).
+        - in: query
+          name: follow
+          schema:
+            type: boolean
+            default: false
+          description: If true, emit `text/event-stream` with live log lines.
+      responses:
+        "200":
+          description: logs
+          content:
+            text/plain:
+              schema:
+                type: string
+                example: |
+                  2026-04-19T22:00:00Z INFO planning
+                  2026-04-19T22:00:02Z INFO dispatched
+            text/event-stream:
+              schema:
+                type: string
+
+  /runs/{id}/cancel:
+    parameters:
+      - $ref: "#/components/parameters/RunId"
+    post:
+      tags: [runs]
+      summary: Cancel a queued or running run
+      operationId: cancelRun
+      responses:
+        "200":
+          description: cancelled
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Run" }
+        "404": { $ref: "#/components/responses/NotFound" }
+        "409":
+          description: Run not in a cancellable state
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /nights:
+    get:
+      tags: [nights]
+      summary: List past nights
+      operationId: listNights
+      parameters:
+        - $ref: "#/components/parameters/FilterSince"
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/NightSummary" }
+
+  /nights/current:
+    get:
+      tags: [nights]
+      summary: Get the in-progress night, if any
+      operationId: getCurrentNight
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Night" }
+        "404":
+          description: No night currently in progress
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /nights/current/stop:
+    post:
+      tags: [nights]
+      summary: Request an orderly early stop of the current night
+      operationId: stopCurrentNight
+      responses:
+        "200":
+          description: stopping
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Night" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /nights/trigger:
+    post:
+      tags: [nights]
+      summary: Start a night off-schedule
+      operationId: triggerNight
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NightTriggerInput" }
+      responses:
+        "202":
+          description: started
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Night" }
+        "409":
+          description: A night is already in progress
+          content:
+            application/problem+json:
+              schema: { $ref: "#/components/schemas/Problem" }
+
+  /nights/{id}:
+    parameters:
+      - $ref: "#/components/parameters/NightId"
+    get:
+      tags: [nights]
+      summary: Get a specific night
+      operationId: getNight
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Night" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /budget:
+    get:
+      tags: [budget]
+      summary: Current token budget snapshot
+      operationId: getBudget
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/BudgetSnapshot" }
+
+  /schedule:
+    get:
+      tags: [schedule]
+      summary: Current schedule
+      operationId: getSchedule
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Schedule" }
+    put:
+      tags: [schedule]
+      summary: Replace the schedule
+      operationId: updateSchedule
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ScheduleInput" }
+      responses:
+        "200":
+          description: updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Schedule" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /prs:
+    get:
+      tags: [prs]
+      summary: List PRs opened by the family
+      operationId: listPRs
+      parameters:
+        - in: query
+          name: state
+          schema:
+            type: string
+            enum: [open, closed, merged, all]
+            default: all
+        - $ref: "#/components/parameters/FilterMember"
+        - $ref: "#/components/parameters/FilterSince"
+        - $ref: "#/components/parameters/PageLimit"
+        - $ref: "#/components/parameters/PageCursor"
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/PR" }
+
+  /prs/{id}:
+    parameters:
+      - in: path
+        name: id
+        required: true
+        schema: { type: string, pattern: "^pr_[0-9A-HJKMNP-TV-Z]{26}$" }
+    get:
+      tags: [prs]
+      summary: Get a PR record
+      operationId: getPR
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/PR" }
+        "404": { $ref: "#/components/responses/NotFound" }
+
+  /config:
+    get:
+      tags: [config]
+      summary: Read the effective daemon configuration
+      operationId: getConfig
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Config" }
+    put:
+      tags: [config]
+      summary: Replace the daemon configuration
+      operationId: updateConfig
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/ConfigInput" }
+      responses:
+        "200":
+          description: updated
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Config" }
+        "400": { $ref: "#/components/responses/BadRequest" }
+
+  /config/reviewers:
+    get:
+      tags: [config]
+      summary: Default reviewers tagged on every PR
+      operationId: getReviewers
+      responses:
+        "200":
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+                example: ["coderabbitai", "cubic-dev-ai"]
+    put:
+      tags: [config]
+      summary: Replace default reviewers
+      operationId: updateReviewers
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: array
+              items: { type: string, minLength: 1 }
+      responses:
+        "200":
+          description: updated
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { type: string }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+      description: |
+        Required when the daemon binds to a non-loopback address. The token
+        is generated at install time and stored in
+        `~/.config/night-family/token`.
+
+  parameters:
+    MemberName:
+      in: path
+      name: name
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z][a-z0-9-]{0,62}$"
+      description: Unique kebab-case name of the family member.
+    DutyType:
+      in: path
+      name: type
+      required: true
+      schema:
+        type: string
+        pattern: "^[a-z][a-z0-9-]{0,62}$"
+    RunId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, pattern: "^run_[0-9A-HJKMNP-TV-Z]{26}$" }
+    NightId:
+      in: path
+      name: id
+      required: true
+      schema: { type: string, pattern: "^night_[0-9A-HJKMNP-TV-Z]{26}$" }
+    FilterMember:
+      in: query
+      name: member
+      schema: { type: string }
+    FilterDuty:
+      in: query
+      name: duty
+      schema: { type: string }
+    FilterStatus:
+      in: query
+      name: status
+      schema:
+        type: string
+        enum: [queued, running, succeeded, failed, cancelled]
+    FilterSince:
+      in: query
+      name: since
+      schema: { type: string, format: date-time }
+    PageLimit:
+      in: query
+      name: limit
+      schema: { type: integer, minimum: 1, maximum: 200, default: 50 }
+    PageCursor:
+      in: query
+      name: cursor
+      schema: { type: string }
+
+  responses:
+    BadRequest:
+      description: Invalid request
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    NotFound:
+      description: Not found
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+    Conflict:
+      description: Conflict
+      content:
+        application/problem+json:
+          schema: { $ref: "#/components/schemas/Problem" }
+
+  schemas:
+
+    Status:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          examples: [ok, ready]
+
+    Problem:
+      description: RFC 9457 Problem Details
+      type: object
+      required: [title, status]
+      properties:
+        type: { type: string, format: uri, default: "about:blank" }
+        title: { type: string }
+        status: { type: integer, minimum: 100, maximum: 599 }
+        detail: { type: string }
+        instance: { type: string, format: uri }
+
+    VersionInfo:
+      type: object
+      required: [version, commit, date, go]
+      properties:
+        version: { type: string, examples: ["v0.1.0"] }
+        commit:  { type: string }
+        date:    { type: string }
+        go:      { type: string }
+
+    ValidationResult:
+      type: object
+      required: [ok]
+      properties:
+        ok: { type: boolean }
+        errors:
+          type: array
+          items:
+            type: object
+            required: [path, message]
+            properties:
+              path: { type: string, examples: ["duties[0].type"] }
+              message: { type: string }
+
+    RiskTolerance:
+      type: string
+      enum: [low, medium, high]
+
+    CostTier:
+      type: string
+      enum: [low, medium, high]
+
+    DutyOutput:
+      type: string
+      enum: [pr, issue, issue-plus-pr, note]
+
+    ProviderRef:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, examples: [claude, codex, copilot] }
+        model: { type: string, examples: ["claude-opus-4-7"] }
+
+    DutyBinding:
+      type: object
+      required: [type, interval]
+      properties:
+        type: { type: string }
+        interval:
+          type: string
+          description: Go duration between runs.
+          pattern: "^[0-9]+(ns|us|µs|ms|s|m|h)$"
+          examples: ["24h", "72h", "30m"]
+        priority:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+        args:
+          type: object
+          additionalProperties: true
+
+    FamilyMember:
+      allOf:
+        - $ref: "#/components/schemas/FamilyMemberInput"
+        - type: object
+          required: [created_at, updated_at]
+          properties:
+            created_at: { type: string, format: date-time }
+            updated_at: { type: string, format: date-time }
+
+    FamilyMemberInput:
+      type: object
+      required: [name, role, system_prompt]
+      properties:
+        name:
+          type: string
+          pattern: "^[a-z][a-z0-9-]{0,62}$"
+        role: { type: string, minLength: 1 }
+        system_prompt: { type: string, minLength: 1 }
+        duties:
+          type: array
+          items: { $ref: "#/components/schemas/DutyBinding" }
+          default: []
+        risk_tolerance:
+          $ref: "#/components/schemas/RiskTolerance"
+          default: medium
+        max_prs_per_night:
+          type: integer
+          minimum: 0
+          maximum: 50
+          default: 2
+        cost_tier:
+          $ref: "#/components/schemas/CostTier"
+          default: medium
+        reviewers:
+          type: array
+          items: { type: string, minLength: 1 }
+          default: []
+        provider:
+          $ref: "#/components/schemas/ProviderRef"
+
+    DutyInfo:
+      type: object
+      required: [type, output, cost_tier, risk]
+      properties:
+        type: { type: string }
+        description: { type: string }
+        output: { $ref: "#/components/schemas/DutyOutput" }
+        cost_tier: { $ref: "#/components/schemas/CostTier" }
+        risk: { $ref: "#/components/schemas/RiskTolerance" }
+        builtin: { type: boolean, default: true }
+
+    PlanRequest:
+      type: object
+      properties:
+        member: { type: string }
+        args:
+          type: object
+          additionalProperties: true
+
+    Plan:
+      type: object
+      required: [duty, has_work]
+      properties:
+        duty: { type: string }
+        has_work: { type: boolean }
+        estimated_tokens: { type: integer, minimum: 0 }
+        notes: { type: string }
+
+    RunStatus:
+      type: string
+      enum: [queued, running, succeeded, failed, cancelled]
+
+    RunRequest:
+      type: object
+      required: [member, duty]
+      properties:
+        member: { type: string }
+        duty: { type: string }
+        args:
+          type: object
+          additionalProperties: true
+        dry_run:
+          type: boolean
+          default: false
+
+    Run:
+      type: object
+      required: [id, member, duty, status, started_at]
+      properties:
+        id: { type: string, pattern: "^run_[0-9A-HJKMNP-TV-Z]{26}$" }
+        night_id: { type: string, pattern: "^night_[0-9A-HJKMNP-TV-Z]{26}$", nullable: true }
+        member: { type: string }
+        duty: { type: string }
+        status: { $ref: "#/components/schemas/RunStatus" }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        tokens_in: { type: integer, minimum: 0, nullable: true }
+        tokens_out: { type: integer, minimum: 0, nullable: true }
+        branch: { type: string, nullable: true }
+        pr_url: { type: string, format: uri, nullable: true }
+        summary: { type: string, nullable: true }
+        error: { type: string, nullable: true }
+
+    PagedRuns:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: "#/components/schemas/Run" }
+        next_cursor: { type: string, nullable: true }
+
+    NightSummary:
+      type: object
+      required: [id, started_at]
+      properties:
+        id: { type: string }
+        started_at: { type: string, format: date-time }
+        finished_at: { type: string, format: date-time, nullable: true }
+        runs_total: { type: integer, minimum: 0 }
+        runs_succeeded: { type: integer, minimum: 0 }
+        prs_opened: { type: integer, minimum: 0 }
+
+    Night:
+      allOf:
+        - $ref: "#/components/schemas/NightSummary"
+        - type: object
+          properties:
+            plan:
+              type: array
+              items:
+                type: object
+                required: [member, duty]
+                properties:
+                  member: { type: string }
+                  duty: { type: string }
+                  estimated_tokens: { type: integer, minimum: 0 }
+            runs:
+              type: array
+              items: { $ref: "#/components/schemas/Run" }
+            summary: { type: string, nullable: true }
+
+    NightTriggerInput:
+      type: object
+      properties:
+        duration:
+          type: string
+          description: Optional Go duration overriding the window length.
+          pattern: "^[0-9]+(ns|us|µs|ms|s|m|h)$"
+        only_members:
+          type: array
+          items: { type: string }
+        only_duties:
+          type: array
+          items: { type: string }
+        dry_run:
+          type: boolean
+          default: false
+
+    BudgetSnapshot:
+      type: object
+      required: [taken_at, provider]
+      properties:
+        taken_at: { type: string, format: date-time }
+        provider: { type: string }
+        remaining_tokens_estimate: { type: integer, minimum: 0 }
+        window_ends_at: { type: string, format: date-time }
+        reserved_for_tonight: { type: integer, minimum: 0 }
+        confidence:
+          type: string
+          enum: [low, medium, high]
+          default: medium
+
+    Schedule:
+      type: object
+      required: [window_start, window_end, timezone]
+      properties:
+        window_start:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+          examples: ["22:00"]
+        window_end:
+          type: string
+          pattern: "^[0-2][0-9]:[0-5][0-9]$"
+          examples: ["05:00"]
+        timezone:
+          type: string
+          description: IANA timezone name; empty = system zone.
+          examples: ["Europe/Berlin", ""]
+        cron:
+          type: string
+          description: Optional cron override; if set, windows are ignored.
+          default: ""
+        next_start:
+          type: string
+          format: date-time
+          readOnly: true
+        next_end:
+          type: string
+          format: date-time
+          readOnly: true
+
+    ScheduleInput:
+      type: object
+      required: [window_start, window_end]
+      properties:
+        window_start: { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$" }
+        window_end:   { type: string, pattern: "^[0-2][0-9]:[0-5][0-9]$" }
+        timezone:     { type: string }
+        cron:         { type: string }
+
+    PR:
+      type: object
+      required: [id, url, member, duty, opened_at, state]
+      properties:
+        id:    { type: string, pattern: "^pr_[0-9A-HJKMNP-TV-Z]{26}$" }
+        url:   { type: string, format: uri }
+        title: { type: string }
+        member: { type: string }
+        duty:   { type: string }
+        run_id: { type: string, nullable: true }
+        opened_at: { type: string, format: date-time }
+        state:
+          type: string
+          enum: [open, closed, merged]
+        merged_at: { type: string, format: date-time, nullable: true }
+
+    Config:
+      allOf:
+        - $ref: "#/components/schemas/ConfigInput"
+        - type: object
+          properties:
+            config_path: { type: string, readOnly: true }
+
+    ConfigInput:
+      type: object
+      properties:
+        log_level:
+          type: string
+          enum: [debug, info, warn, error]
+          default: info
+        providers:
+          type: array
+          items: { $ref: "#/components/schemas/ProviderRef" }
+        reviewers:
+          type: array
+          items: { type: string }
+        max_concurrent_runs:
+          type: integer
+          minimum: 1
+          maximum: 16
+          default: 1
+        main_branch:
+          type: string
+          default: main
+        require_branch_protection:
+          type: boolean
+          default: true
+        pr_size_caps:
+          type: object
+          properties:
+            max_files: { type: integer, minimum: 1, default: 25 }
+            max_lines: { type: integer, minimum: 1, default: 500 }
