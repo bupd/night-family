@@ -200,22 +200,54 @@ func main() {
 	go func() { errCh <- srv.ListenAndServe() }()
 
 	sig := make(chan os.Signal, 1)
-	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM)
+	signal.Notify(sig, syscall.SIGINT, syscall.SIGTERM, syscall.SIGHUP)
 
-	select {
-	case err := <-errCh:
-		if err != nil {
-			fatal(logger, "listen: %v", err)
-		}
-	case s := <-sig:
-		logger.Info("shutdown signal", "signal", s.String())
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := srv.Shutdown(ctx); err != nil {
-			logger.Error("shutdown", "err", err)
-			os.Exit(1)
+	for {
+		select {
+		case err := <-errCh:
+			if err != nil {
+				fatal(logger, "listen: %v", err)
+			}
+			return
+		case s := <-sig:
+			if s == syscall.SIGHUP {
+				reloadFamily(logger, fam, dir)
+				continue
+			}
+			logger.Info("shutdown signal", "signal", s.String())
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+			if err := srv.Shutdown(ctx); err != nil {
+				logger.Error("shutdown", "err", err)
+				os.Exit(1)
+			}
+			return
 		}
 	}
+}
+
+// reloadFamily re-reads the on-disk family YAMLs and Put()s each into
+// the live store. Invoked by SIGHUP. Name-collision = user file wins
+// (same rule as startup). Deletions on disk don't remove from the
+// store yet — operators needing that should use 'nf family remove'.
+func reloadFamily(logger *slog.Logger, fam *family.Store, dir string) {
+	if dir == "" {
+		logger.Warn("SIGHUP: no family-dir configured, nothing to reload")
+		return
+	}
+	extras, errs := family.LoadDiskDir(dir)
+	for _, e := range errs {
+		logger.Warn("SIGHUP: family-dir load issue", "dir", dir, "err", e)
+	}
+	n := 0
+	for _, m := range extras {
+		if _, err := fam.Put(m); err != nil {
+			logger.Warn("SIGHUP: member rejected", "name", m.Name, "err", err)
+			continue
+		}
+		n++
+	}
+	logger.Info("SIGHUP: family reloaded", "dir", dir, "applied", n, "total", fam.Len())
 }
 
 func newLogger(level string) *slog.Logger {
