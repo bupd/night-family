@@ -9,7 +9,14 @@
   </p>
 </section>
 
-<section class="nf-grid">
+<section class="nf-grid"
+         hx-get="/ui/dashboard-cards"
+         hx-trigger="load, every 15s"
+         hx-swap="innerHTML">
+  <p class="nf-empty">Loading…</p>
+</section>
+
+<section class="nf-grid" style="margin-top:1.5rem;">
   <article class="nf-card">
     <h2>Tonight's plan</h2>
     <p>Preview what night-family would run right now: <a href="/plan">/plan</a> or <a href="/api/v1/nights/preview">raw JSON</a>.</p>

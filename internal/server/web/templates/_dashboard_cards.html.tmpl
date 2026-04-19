@@ -1,0 +1,31 @@
+{{define "_dashboard_cards"}}
+<article class="nf-card">
+  <h2>Nights</h2>
+  <p class="nf-stat">{{.Stats.Nights}}</p>
+  <p><a href="/nights">browse →</a></p>
+</article>
+<article class="nf-card">
+  <h2>Runs</h2>
+  <p class="nf-stat">{{.Stats.Runs}}</p>
+  <p>
+    {{with .Stats.RunsByStatus.succeeded}}<span class="nf-pill nf-ok">{{.}} succeeded</span>{{end}}
+    {{with .Stats.RunsByStatus.failed}}<span class="nf-pill nf-bad">{{.}} failed</span>{{end}}
+  </p>
+  <p><a href="/runs">browse →</a></p>
+</article>
+<article class="nf-card">
+  <h2>PRs</h2>
+  <p class="nf-stat">{{.Stats.PRs}}</p>
+  <p>
+    {{with .Stats.PRsByState.open}}<span class="nf-pill">{{.}} open</span>{{end}}
+    {{with .Stats.PRsByState.merged}}<span class="nf-pill nf-ok">{{.}} merged</span>{{end}}
+  </p>
+  <p><a href="/prs">browse →</a></p>
+</article>
+<article class="nf-card">
+  <h2>Schedule</h2>
+  <p>{{.Schedule.WindowStart}} → {{.Schedule.WindowEnd}}
+     {{if .Schedule.TimeZone}}({{.Schedule.TimeZone}}){{end}}</p>
+  <p>{{if .InWindow}}<span class="nf-pill nf-ok">in window</span>{{else}}<span class="nf-pill">next: {{.NextStart.Format "15:04 MST"}}</span>{{end}}</p>
+</article>
+{{end}}
