@@ -165,6 +165,11 @@ func parseFile(dir fs.FS, name string) (Member, error) {
 	return m, nil
 }
 
+// ApplyDefaults fills in documented defaults for fields the caller
+// omitted. Exported so API handlers can mirror the Store's validation
+// contract before calling Validate.
+func (m *Member) ApplyDefaults() { m.applyDefaults() }
+
 // applyDefaults fills in documented defaults for fields the YAML omitted.
 func (m *Member) applyDefaults() {
 	if m.RiskTolerance == "" {
