@@ -17,6 +17,8 @@ import (
 
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
+	"github.com/bupd/night-family/internal/provider"
+	"github.com/bupd/night-family/internal/runner"
 	"github.com/bupd/night-family/internal/schedule"
 	"github.com/bupd/night-family/internal/server"
 	"github.com/bupd/night-family/internal/storage"
@@ -54,6 +56,19 @@ func main() {
 	}
 	defer db.Close()
 
+	prov := provider.NewMock()
+	logger.Info("provider", "name", prov.Name())
+	run, err := runner.New(runner.Deps{
+		Family:   fam,
+		Duties:   duties,
+		Storage:  db,
+		Provider: prov,
+		Logger:   logger,
+	})
+	if err != nil {
+		fatal(logger, "runner: %v", err)
+	}
+
 	srv, err := server.New(server.Config{
 		Addr:     *addr,
 		Logger:   logger,
@@ -61,6 +76,7 @@ func main() {
 		Duties:   duties,
 		Schedule: &sched,
 		Storage:  db,
+		Runner:   run,
 	})
 	if err != nil {
 		fatal(logger, "server init: %v", err)
