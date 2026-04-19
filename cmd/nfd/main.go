@@ -39,6 +39,9 @@ func main() {
 	skipPush := flag.Bool("skip-push", false, "orchestrator stops after local commit (does not push)")
 	skipPR := flag.Bool("skip-pr", false, "orchestrator stops after push (does not open a PR)")
 	autoTrigger := flag.Bool("auto-trigger", false, "fire a night automatically when the schedule window opens")
+	providerName := flag.String("provider", "mock", "provider to dispatch through: 'mock' or 'claude'")
+	claudeBin := flag.String("claude-bin", "claude", "claude CLI binary path (used when --provider=claude)")
+	claudeArgs := flag.String("claude-args", "", "extra space-separated args to pass to the claude binary")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -67,7 +70,10 @@ func main() {
 	}
 	defer db.Close()
 
-	prov := provider.NewMock()
+	prov, err := buildProvider(*providerName, *claudeBin, *claudeArgs)
+	if err != nil {
+		fatal(logger, "provider: %v", err)
+	}
 	logger.Info("provider", "name", prov.Name())
 
 	var orch *gitops.Orchestrator
@@ -185,6 +191,26 @@ func openStorage(ctx context.Context, explicit string, logger *slog.Logger) (*st
 	}
 	logger.Info("storage", "dsn", dsn)
 	return storage.Open(ctx, dsn)
+}
+
+// buildProvider resolves the --provider flag into a provider.Provider
+// instance. Unknown names fail loudly so users catch typos at boot.
+func buildProvider(name, bin, extraArgs string) (provider.Provider, error) {
+	switch name {
+	case "", "mock":
+		return provider.NewMock(), nil
+	case "claude":
+		c := provider.NewClaude()
+		if bin != "" {
+			c.Bin = bin
+		}
+		if extraArgs != "" {
+			c.ExtraArgs = strings.Fields(extraArgs)
+		}
+		return c, nil
+	default:
+		return nil, fmt.Errorf("unknown provider %q (valid: mock, claude)", name)
+	}
 }
 
 func fatal(logger *slog.Logger, format string, args ...any) {
