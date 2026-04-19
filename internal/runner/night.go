@@ -60,6 +60,19 @@ func (r *Runner) TriggerNight(ctx context.Context, sched *schedule.Schedule, opt
 		return NightResult{}, fmt.Errorf("runner: insert night: %w", err)
 	}
 
+	// Record a budget snapshot at night start so the dashboard /
+	// /api/v1/budget can show "we reserved X of an estimated Y
+	// remaining" without extra probing. The remaining estimate is
+	// best-effort; once a session-status probe lands this becomes a
+	// real observation.
+	_, _ = r.deps.Storage.InsertBudgetSnapshot(ctx, storage.BudgetSnapshot{
+		Provider:                r.deps.Provider.Name(),
+		RemainingTokensEstimate: max(plan.BudgetTokens, plan.ReservedTokens*2),
+		ReservedForTonight:      plan.ReservedTokens,
+		WindowEndsAt:            &plan.WindowEnd,
+		Confidence:              "low",
+	})
+
 	var runs []storage.Run
 	if !opts.DryRun {
 		for _, slot := range plan.Slots {
