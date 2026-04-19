@@ -22,7 +22,11 @@ Usage:
 
 Commands:
   version    Print build metadata
+  family     Inspect the family roster (list|show)
   help       Show this help
+
+Environment:
+  NF_DAEMON_URL   Base URL of the nfd daemon (default http://127.0.0.1:7337)
 
 Run 'nf <command> -h' for command-specific help.
 `
@@ -35,6 +39,8 @@ func main() {
 	switch os.Args[1] {
 	case "version", "--version", "-v":
 		versionCmd(os.Args[2:])
+	case "family":
+		familyCmd(os.Args[2:])
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
