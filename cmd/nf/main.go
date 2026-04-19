@@ -27,6 +27,10 @@ Commands:
   night      Inspect or trigger nightly plans (preview)
   run        Inspect recorded runs (list|show)
   pr         Inspect PRs opened by the family (list)
+  schedule   Show the configured window (show)
+  budget     Show the latest budget snapshot (show)
+  stats      Print the daemon's aggregate stats
+  doctor     Probe the daemon for basic liveness
   help       Show this help
 
 Environment:
@@ -53,6 +57,14 @@ func main() {
 		runCmd(os.Args[2:])
 	case "pr":
 		prCmd(os.Args[2:])
+	case "schedule":
+		scheduleCmd(os.Args[2:])
+	case "budget":
+		budgetCmd(os.Args[2:])
+	case "stats":
+		statsCmd(os.Args[2:])
+	case "doctor":
+		doctorCmd(os.Args[2:])
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
