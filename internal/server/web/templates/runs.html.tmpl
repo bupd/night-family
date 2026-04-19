@@ -1,0 +1,37 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>Runs</h1>
+  <p class="nf-tagline">
+    {{len .Runs}} run{{if ne (len .Runs) 1}}s{{end}} on record.
+    <a href="/api/v1/runs">raw JSON</a>.
+  </p>
+</section>
+
+{{if .Runs}}
+<section>
+  <table class="nf-table">
+    <thead>
+      <tr><th>ID</th><th>Member</th><th>Duty</th><th>Status</th><th>Started</th><th>Finished</th><th>PR</th></tr>
+    </thead>
+    <tbody>
+      {{range .Runs}}
+      <tr>
+        <td><code>{{.ID}}</code></td>
+        <td>{{.Member}}</td>
+        <td><code>{{.Duty}}</code></td>
+        <td>{{.Status}}</td>
+        <td>{{.StartedAt.Format "2006-01-02 15:04:05 MST"}}</td>
+        <td>{{if .FinishedAt}}{{.FinishedAt.Format "15:04:05"}}{{else}}—{{end}}</td>
+        <td>{{if .PRURL}}<a href="{{.PRURL}}">↗</a>{{else}}—{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
+{{else}}
+<p class="nf-empty">
+  No runs yet. Runs get created once a scheduler or manual trigger
+  dispatches a duty through a provider — that lands in the next iteration.
+</p>
+{{end}}
+{{end}}
