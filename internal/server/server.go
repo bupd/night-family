@@ -19,6 +19,7 @@ import (
 
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
+	"github.com/bupd/night-family/internal/runner"
 	"github.com/bupd/night-family/internal/schedule"
 	"github.com/bupd/night-family/internal/storage"
 	"github.com/bupd/night-family/internal/version"
@@ -54,6 +55,8 @@ type Config struct {
 	// Storage, when set, enables the persisted /runs, /nights, and
 	// /prs surfaces.
 	Storage *storage.DB
+	// Runner, when set, enables POST /api/v1/runs (dispatch).
+	Runner *runner.Runner
 }
 
 // Server is the running HTTP server.
