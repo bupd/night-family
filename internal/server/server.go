@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/version"
 )
 
@@ -35,6 +36,9 @@ type Config struct {
 	Addr string
 	// Logger used by handlers. Must be non-nil.
 	Logger *slog.Logger
+	// Family is the in-memory store the /family* handlers read from.
+	// When nil, the family routes are not registered.
+	Family *family.Store
 }
 
 // Server is the running HTTP server.
@@ -99,6 +103,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /openapi.yaml", s.serveOpenAPIYAML)
 	mux.HandleFunc("GET /openapi.json", s.serveOpenAPIJSON)
 	mux.HandleFunc("GET /docs", s.serveDocs)
+	s.familyRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
@@ -155,8 +160,9 @@ func (s *Server) renderPage(w http.ResponseWriter, page string, data any) {
 // `content` block isn't shared across pages.
 func parsePages(web fs.FS) (map[string]*template.Template, error) {
 	pages := map[string]string{
-		"index": "templates/index.html.tmpl",
-		"docs":  "templates/docs.html.tmpl",
+		"index":  "templates/index.html.tmpl",
+		"docs":   "templates/docs.html.tmpl",
+		"family": "templates/family.html.tmpl",
 	}
 	out := make(map[string]*template.Template, len(pages))
 	for name, path := range pages {
