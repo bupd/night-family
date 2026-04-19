@@ -4,8 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"path/filepath"
 	"time"
 
+	"github.com/bupd/night-family/internal/digest"
 	"github.com/bupd/night-family/internal/planner"
 	"github.com/bupd/night-family/internal/schedule"
 	"github.com/bupd/night-family/internal/storage"
@@ -101,12 +104,50 @@ finish:
 	_ = r.deps.Storage.FinishNight(ctx, nightID, time.Now().UTC(), summary)
 	r.deps.Logger.Info("night done", "night", nightID, "runs", len(runs))
 
+	// Write a morning digest to disk when DigestDir is configured.
+	// Best-effort — failures here don't fail the night.
+	if r.deps.DigestDir != "" {
+		if err := r.writeDigest(ctx, nightID, runs); err != nil {
+			r.deps.Logger.Warn("digest write failed (non-fatal)", "night", nightID, "err", err)
+		}
+	}
+
 	return NightResult{
 		ID:      nightID,
 		Runs:    runs,
 		Plan:    plan,
 		Skipped: len(plan.Skipped),
 	}, nil
+}
+
+// writeDigest renders and persists the morning digest for the given
+// nightID. Called at the tail of TriggerNight; errors are logged
+// rather than surfaced so a failed digest write doesn't ruin an
+// otherwise-good night.
+func (r *Runner) writeDigest(ctx context.Context, nightID string, runs []storage.Run) error {
+	night, err := r.deps.Storage.GetNight(ctx, nightID)
+	if err != nil {
+		return fmt.Errorf("get night: %w", err)
+	}
+	prs, _ := r.deps.Storage.ListPRs(ctx, 200)
+	// Filter PRs to just the ones attached to runs from this night.
+	byRun := map[string]bool{}
+	for _, rn := range runs {
+		byRun[rn.ID] = true
+	}
+	filtered := prs[:0]
+	for _, p := range prs {
+		if p.RunID != nil && byRun[*p.RunID] {
+			filtered = append(filtered, p)
+		}
+	}
+	body := digest.Render(digest.Night{Night: night, Runs: runs, PRs: filtered})
+
+	if err := os.MkdirAll(r.deps.DigestDir, 0o755); err != nil {
+		return err
+	}
+	name := night.StartedAt.Format("2006-01-02") + "-" + nightID + ".md"
+	return os.WriteFile(filepath.Join(r.deps.DigestDir, name), []byte(body), 0o644)
 }
 
 // filterSlots returns only slots that match the allow-lists (or all
