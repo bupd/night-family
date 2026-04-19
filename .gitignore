@@ -1,0 +1,27 @@
+# Binaries
+/bin/
+/dist/
+nf
+nfd
+nf-api
+
+# Go
+*.test
+*.out
+/coverage.txt
+/vendor/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local data
+*.db
+*.db-shm
+*.db-wal
+/.night-family/local/
