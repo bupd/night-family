@@ -20,6 +20,7 @@ import (
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/schedule"
+	"github.com/bupd/night-family/internal/storage"
 	"github.com/bupd/night-family/internal/version"
 )
 
@@ -50,6 +51,9 @@ type Config struct {
 	// Clock, when set, replaces time.Now() in handlers — used in tests
 	// to pin the "current" time.
 	Clock schedule.Clock
+	// Storage, when set, enables the persisted /runs, /nights, and
+	// /prs surfaces.
+	Storage *storage.DB
 }
 
 // Server is the running HTTP server.
@@ -118,6 +122,7 @@ func (s *Server) routes() http.Handler {
 	s.dutiesRoutes(mux)
 	s.scheduleRoutes(mux)
 	s.plannerRoutes(mux)
+	s.runsRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
@@ -179,6 +184,7 @@ func parsePages(web fs.FS) (map[string]*template.Template, error) {
 		"family": "templates/family.html.tmpl",
 		"duties": "templates/duties.html.tmpl",
 		"plan":   "templates/plan.html.tmpl",
+		"runs":   "templates/runs.html.tmpl",
 	}
 	funcs := template.FuncMap{
 		"inc": func(i int) int { return i + 1 },
