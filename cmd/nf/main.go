@@ -31,6 +31,7 @@ Commands:
   budget     Show the latest budget snapshot (show)
   stats      Print the daemon's aggregate stats
   doctor     Probe the daemon for basic liveness
+  digest     Read a night's morning digest (show)
   help       Show this help
 
 Environment:
@@ -65,6 +66,8 @@ func main() {
 		statsCmd(os.Args[2:])
 	case "doctor":
 		doctorCmd(os.Args[2:])
+	case "digest":
+		digestCmd(os.Args[2:])
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
