@@ -1,0 +1,31 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>Nights</h1>
+  <p class="nf-tagline">
+    {{len .Nights}} night{{if ne (len .Nights) 1}}s{{end}} on record.
+    <a href="/api/v1/nights">raw JSON</a>.
+  </p>
+</section>
+
+{{if .Nights}}
+<section>
+  <table class="nf-table">
+    <thead>
+      <tr><th>ID</th><th>Started</th><th>Finished</th><th>Summary</th></tr>
+    </thead>
+    <tbody>
+      {{range .Nights}}
+      <tr>
+        <td><code>{{.ID}}</code></td>
+        <td>{{.StartedAt.Format "2006-01-02 15:04 MST"}}</td>
+        <td>{{if .FinishedAt}}{{.FinishedAt.Format "15:04:05"}}{{else}}—{{end}}</td>
+        <td>{{if .Summary}}{{.Summary}}{{else}}—{{end}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
+{{else}}
+<p class="nf-empty">No nights yet. Trigger one via <code>nf night trigger</code> or wait for the scheduler to fire.</p>
+{{end}}
+{{end}}
