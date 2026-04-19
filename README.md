@@ -118,6 +118,8 @@ recipe in [`docs/STATUS.md`](docs/STATUS.md).
 - [`docs/IDEAS.md`](docs/IDEAS.md) — scratchpad of future ideas
 - [`docs/DECISIONS.md`](docs/DECISIONS.md) — ADRs as we go
 - [`docs/STATUS.md`](docs/STATUS.md) — what works today
+- [`docs/INSTALL.md`](docs/INSTALL.md) — dev + systemd install
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — commit/PR conventions
 
 ## License
 

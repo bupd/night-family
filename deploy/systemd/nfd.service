@@ -1,0 +1,51 @@
+[Unit]
+Description=night-family daemon
+Documentation=https://github.com/bupd/night-family
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+# Replace $USER with the account that owns the repo checkout and has
+# gh / claude authenticated. Running under root is strongly discouraged.
+User=%i
+Group=%i
+
+# Config and state. Override via -db / -family-dir flags below.
+Environment=XDG_CONFIG_HOME=%h/.config
+Environment=XDG_STATE_HOME=%h/.local/share
+
+# Recommended defaults. Edit /etc/default/nfd (loaded below) to override.
+EnvironmentFile=-/etc/default/nfd
+
+ExecStart=/usr/local/bin/nfd \
+    --addr 127.0.0.1:7337 \
+    --db %h/.local/share/night-family/nf.db \
+    --family-dir %h/.config/night-family/family \
+    --provider ${NF_PROVIDER:-claude} \
+    --reviewers ${NF_REVIEWERS:-coderabbitai,cubic-dev-ai} \
+    --auto-trigger
+
+Restart=on-failure
+RestartSec=10
+TimeoutStopSec=30
+
+# Hardening — we don't need much.
+ProtectSystem=strict
+ReadWritePaths=%h/.local/share/night-family %h/.config/night-family
+ProtectHome=read-only
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+
+# Without this, the systemd cgroup accounting for subprocess PIDs
+# (git, gh, claude) gets noisy.
+TasksMax=512
+
+[Install]
+WantedBy=multi-user.target
