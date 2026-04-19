@@ -1,0 +1,48 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>Tonight's plan</h1>
+  <p class="nf-tagline">
+    {{len .Plan.Slots}} slot{{if ne (len .Plan.Slots) 1}}s{{end}},
+    ~{{.Plan.ReservedTokens}} tokens reserved.
+    Window: {{.Plan.WindowStart.Format "2006-01-02 15:04 MST"}} → {{.Plan.WindowEnd.Format "15:04 MST"}}.
+    <a href="/api/v1/nights/preview">raw JSON</a>.
+  </p>
+</section>
+
+{{if .Plan.Slots}}
+<section>
+  <table class="nf-table">
+    <thead>
+      <tr><th>#</th><th>Member</th><th>Duty</th><th>Priority</th><th>Output</th><th>Cost</th><th>Risk</th><th>Est. tokens</th></tr>
+    </thead>
+    <tbody>
+      {{range $i, $s := .Plan.Slots}}
+      <tr>
+        <td>{{inc $i}}</td>
+        <td><code>{{$s.Member}}</code></td>
+        <td><code>{{$s.Duty}}</code></td>
+        <td>{{$s.Priority}}</td>
+        <td>{{$s.Output}}</td>
+        <td>{{$s.CostTier}}</td>
+        <td>{{$s.Risk}}</td>
+        <td>{{$s.EstimatedTokens}}</td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
+{{else}}
+<p class="nf-empty">No slots — nothing to run tonight.</p>
+{{end}}
+
+{{if .Plan.Skipped}}
+<section class="nf-card" style="margin-top:2rem;">
+  <h2>Skipped</h2>
+  <ul>
+    {{range .Plan.Skipped}}
+    <li><code>{{.Member}} / {{.Duty}}</code> — {{.Reason}}</li>
+    {{end}}
+  </ul>
+</section>
+{{end}}
+{{end}}
