@@ -1,0 +1,37 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>Family</h1>
+  <p class="nf-tagline">
+    {{len .Members}} member{{if ne (len .Members) 1}}s{{end}} currently loaded.
+    <a href="/api/v1/family">raw JSON</a>.
+  </p>
+</section>
+
+{{if .Members}}
+<section class="nf-grid">
+  {{range .Members}}
+  <article class="nf-card">
+    <h2>{{.Name}}</h2>
+    <p class="nf-role">{{.Role}}</p>
+    <dl class="nf-meta">
+      <dt>Risk</dt><dd>{{.RiskTolerance}}</dd>
+      <dt>Cost</dt><dd>{{.CostTier}}</dd>
+      <dt>Max PRs/night</dt><dd>{{.MaxPRsPerNight}}</dd>
+      <dt>Duties</dt>
+      <dd>
+        {{if .Duties}}
+          <ul class="nf-duties">
+          {{range .Duties}}
+            <li><code>{{.Type}}</code> <span class="nf-muted">@ {{.Interval}}</span></li>
+          {{end}}
+          </ul>
+        {{else}}<em>none</em>{{end}}
+      </dd>
+    </dl>
+  </article>
+  {{end}}
+</section>
+{{else}}
+<p class="nf-empty">No family members loaded. Drop YAML files in ~/.config/night-family/family/.</p>
+{{end}}
+{{end}}
