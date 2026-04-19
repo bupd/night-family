@@ -138,6 +138,7 @@ func (s *Server) routes() http.Handler {
 	s.dashboardRoutes(mux)
 	s.budgetRoutes(mux)
 	s.metricsRoutes(mux)
+	s.digestRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
