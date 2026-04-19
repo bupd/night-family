@@ -1,0 +1,24 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>Duties</h1>
+  <p class="nf-tagline">
+    {{len .Duties}} duty type{{if ne (len .Duties) 1}}s{{end}} registered.
+    <a href="/api/v1/duties">raw JSON</a>.
+  </p>
+</section>
+
+<section class="nf-grid">
+  {{range .Duties}}
+  <article class="nf-card">
+    <h2>{{.Type}}</h2>
+    <p>{{.Description}}</p>
+    <dl class="nf-meta">
+      <dt>Output</dt><dd><code>{{.Output}}</code></dd>
+      <dt>Cost</dt><dd>{{.CostTier}}</dd>
+      <dt>Risk</dt><dd>{{.Risk}}</dd>
+      <dt>Built-in</dt><dd>{{if .Builtin}}yes{{else}}no{{end}}</dd>
+    </dl>
+  </article>
+  {{end}}
+</section>
+{{end}}

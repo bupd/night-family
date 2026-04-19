@@ -17,6 +17,7 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/version"
 )
@@ -39,6 +40,9 @@ type Config struct {
 	// Family is the in-memory store the /family* handlers read from.
 	// When nil, the family routes are not registered.
 	Family *family.Store
+	// Duties is the duty registry the /duties* handlers read from. When
+	// nil, those routes are not registered.
+	Duties *duty.Registry
 }
 
 // Server is the running HTTP server.
@@ -104,6 +108,7 @@ func (s *Server) routes() http.Handler {
 	mux.HandleFunc("GET /openapi.json", s.serveOpenAPIJSON)
 	mux.HandleFunc("GET /docs", s.serveDocs)
 	s.familyRoutes(mux)
+	s.dutiesRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
@@ -163,6 +168,7 @@ func parsePages(web fs.FS) (map[string]*template.Template, error) {
 		"index":  "templates/index.html.tmpl",
 		"docs":   "templates/docs.html.tmpl",
 		"family": "templates/family.html.tmpl",
+		"duties": "templates/duties.html.tmpl",
 	}
 	out := make(map[string]*template.Template, len(pages))
 	for name, path := range pages {
