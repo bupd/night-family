@@ -6,13 +6,91 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strings"
 	"text/tabwriter"
 )
+
+func nightTrigger(args []string) {
+	fs := flag.NewFlagSet("night trigger", flag.ExitOnError)
+	members := fs.String("only-members", "", "comma-separated member names to include (default: all)")
+	duties := fs.String("only-duties", "", "comma-separated duty types to include (default: all)")
+	budget := fs.Int("budget", 0, "token budget ceiling (0 = unlimited)")
+	dryRun := fs.Bool("dry-run", false, "plan the night but do not dispatch runs")
+	_ = fs.Parse(args)
+
+	body := map[string]any{}
+	if *members != "" {
+		body["only_members"] = strings.Split(*members, ",")
+	}
+	if *duties != "" {
+		body["only_duties"] = strings.Split(*duties, ",")
+	}
+	if *budget > 0 {
+		body["budget"] = *budget
+	}
+	if *dryRun {
+		body["dry_run"] = true
+	}
+	raw, _ := json.Marshal(body)
+	var res map[string]any
+	if err := apiPost("/api/v1/nights/trigger", raw, &res); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+		os.Exit(1)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(res)
+}
+
+func nightList(_ []string) {
+	var body map[string]any
+	if err := apiGet("/api/v1/nights", &body); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+		os.Exit(1)
+	}
+	items, _ := body["items"].([]any)
+	if len(items) == 0 {
+		fmt.Println("(no nights)")
+		return
+	}
+	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(tw, "ID\tSTARTED\tFINISHED\tSUMMARY")
+	for _, it := range items {
+		m := it.(map[string]any)
+		started, _ := m["started_at"].(string)
+		finished, _ := m["finished_at"].(string)
+		if finished == "" {
+			finished = "—"
+		}
+		summary, _ := m["summary"].(string)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", m["id"], started, finished, summary)
+	}
+	_ = tw.Flush()
+}
+
+func nightShow(args []string) {
+	if len(args) == 0 {
+		fmt.Fprintln(os.Stderr, "nf night show: <id> required")
+		os.Exit(2)
+	}
+	var body map[string]any
+	if err := apiGet("/api/v1/nights/"+args[0], &body); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+		os.Exit(1)
+	}
+	enc := json.NewEncoder(os.Stdout)
+	enc.SetIndent("", "  ")
+	_ = enc.Encode(body)
+}
 
 const nightUsage = `nf night — inspect or trigger nightly plans
 
 Usage:
-  nf night preview [--budget N] [--json]    Show what would run if a night started now
+  nf night preview [--budget N] [--json]                          Show what would run if a night started now
+  nf night trigger [--only-members X,Y] [--only-duties A,B] [--dry-run] [--budget N]
+                                                                  Dispatch a night synchronously via the daemon's provider
+  nf night list                                                   List past nights
+  nf night show <id>                                              Show one night
 `
 
 type nightSlot struct {
@@ -49,6 +127,12 @@ func nightCmd(args []string) {
 	switch args[0] {
 	case "preview":
 		nightPreview(args[1:])
+	case "trigger":
+		nightTrigger(args[1:])
+	case "list":
+		nightList(args[1:])
+	case "show":
+		nightShow(args[1:])
 	case "help", "-h", "--help":
 		fmt.Print(nightUsage)
 	default:
