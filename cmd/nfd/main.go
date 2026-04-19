@@ -23,6 +23,7 @@ import (
 	"github.com/bupd/night-family/internal/provider"
 	"github.com/bupd/night-family/internal/runner"
 	"github.com/bupd/night-family/internal/schedule"
+	nfscheduler "github.com/bupd/night-family/internal/scheduler"
 	"github.com/bupd/night-family/internal/server"
 	"github.com/bupd/night-family/internal/storage"
 )
@@ -37,6 +38,7 @@ func main() {
 	signOff := flag.Bool("signoff", true, "add a DCO Signed-off-by trailer to commits")
 	skipPush := flag.Bool("skip-push", false, "orchestrator stops after local commit (does not push)")
 	skipPR := flag.Bool("skip-pr", false, "orchestrator stops after push (does not open a PR)")
+	autoTrigger := flag.Bool("auto-trigger", false, "fire a night automatically when the schedule window opens")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -116,6 +118,20 @@ func main() {
 	})
 	if err != nil {
 		fatal(logger, "server init: %v", err)
+	}
+
+	loopCtx, loopCancel := context.WithCancel(context.Background())
+	defer loopCancel()
+	if *autoTrigger {
+		loop := nfscheduler.New(nfscheduler.Options{
+			Schedule: &sched,
+			Runner:   run,
+			Logger:   logger,
+		})
+		loop.Start(loopCtx)
+		logger.Info("scheduler loop running", "window", sched.WindowStart+"-"+sched.WindowEnd)
+	} else {
+		logger.Info("auto-trigger disabled (pass --auto-trigger to enable)")
 	}
 
 	errCh := make(chan error, 1)
