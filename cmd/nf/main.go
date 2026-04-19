@@ -26,6 +26,7 @@ Commands:
   duty       Inspect the duty catalogue (list|show)
   night      Inspect or trigger nightly plans (preview)
   run        Inspect recorded runs (list|show)
+  pr         Inspect PRs opened by the family (list)
   help       Show this help
 
 Environment:
@@ -50,6 +51,8 @@ func main() {
 		nightCmd(os.Args[2:])
 	case "run":
 		runCmd(os.Args[2:])
+	case "pr":
+		prCmd(os.Args[2:])
 	case "help", "--help", "-h":
 		fmt.Print(usage)
 	default:
