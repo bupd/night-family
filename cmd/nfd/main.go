@@ -15,6 +15,7 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/server"
 )
@@ -35,10 +36,14 @@ func main() {
 	fam.Seed(defaults)
 	logger.Info("family seeded", "count", fam.Len())
 
+	duties := duty.NewBuiltinRegistry()
+	logger.Info("duties loaded", "count", duties.Len())
+
 	srv, err := server.New(server.Config{
 		Addr:   *addr,
 		Logger: logger,
 		Family: fam,
+		Duties: duties,
 	})
 	if err != nil {
 		fatal(logger, "server init: %v", err)
