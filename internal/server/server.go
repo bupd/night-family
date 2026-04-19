@@ -117,6 +117,7 @@ func (s *Server) routes() http.Handler {
 	s.familyRoutes(mux)
 	s.dutiesRoutes(mux)
 	s.scheduleRoutes(mux)
+	s.plannerRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
@@ -177,10 +178,14 @@ func parsePages(web fs.FS) (map[string]*template.Template, error) {
 		"docs":   "templates/docs.html.tmpl",
 		"family": "templates/family.html.tmpl",
 		"duties": "templates/duties.html.tmpl",
+		"plan":   "templates/plan.html.tmpl",
+	}
+	funcs := template.FuncMap{
+		"inc": func(i int) int { return i + 1 },
 	}
 	out := make(map[string]*template.Template, len(pages))
 	for name, path := range pages {
-		tpl, err := template.New(name).ParseFS(web, "templates/base.html.tmpl", path)
+		tpl, err := template.New(name).Funcs(funcs).ParseFS(web, "templates/base.html.tmpl", path)
 		if err != nil {
 			return nil, err
 		}
