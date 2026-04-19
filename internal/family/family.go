@@ -113,6 +113,17 @@ func LoadDir(dir fs.FS) ([]Member, []error) {
 	return members, []error{err}
 }
 
+// LoadDiskDir is LoadDir against a path on the real filesystem. If the
+// path doesn't exist, it returns (nil, nil) — a missing config dir is
+// a normal state, not an error.
+func LoadDiskDir(path string) ([]Member, []error) {
+	info, err := osStat(path)
+	if err != nil || !info.IsDir() {
+		return nil, nil
+	}
+	return LoadDir(osDirFS(path))
+}
+
 // loadDir is the internal helper shared by Load* variants.
 func loadDir(dir fs.FS) ([]Member, error) {
 	entries, err := fs.ReadDir(dir, ".")
