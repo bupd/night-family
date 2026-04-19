@@ -1,0 +1,35 @@
+{{define "content"}}
+<section class="nf-hero">
+  <h1>PRs</h1>
+  <p class="nf-tagline">
+    {{len .PRs}} PR{{if ne (len .PRs) 1}}s{{end}} opened by the family.
+    <a href="/api/v1/prs">raw JSON</a>.
+  </p>
+</section>
+
+{{if .PRs}}
+<section>
+  <table class="nf-table">
+    <thead>
+      <tr><th>Opened</th><th>Member</th><th>Duty</th><th>State</th><th>URL</th></tr>
+    </thead>
+    <tbody>
+      {{range .PRs}}
+      <tr>
+        <td>{{.OpenedAt.Format "2006-01-02 15:04 MST"}}</td>
+        <td>{{.Member}}</td>
+        <td><code>{{.Duty}}</code></td>
+        <td>{{.State}}</td>
+        <td><a href="{{.URL}}">↗</a></td>
+      </tr>
+      {{end}}
+    </tbody>
+  </table>
+</section>
+{{else}}
+<p class="nf-empty">
+  No PRs yet. PRs get opened when a run succeeds and the daemon was
+  started with <code>--repo</code> pointing at a writable checkout.
+</p>
+{{end}}
+{{end}}
