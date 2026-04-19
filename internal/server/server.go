@@ -61,11 +61,12 @@ type Config struct {
 
 // Server is the running HTTP server.
 type Server struct {
-	cfg   Config
-	srv   *http.Server
-	pages map[string]*template.Template
-	web   fs.FS
-	spec  *specBundle
+	cfg         Config
+	srv         *http.Server
+	pages       map[string]*template.Template
+	dashCardTpl *template.Template
+	web         fs.FS
+	spec        *specBundle
 }
 
 // New constructs a Server. Templates are parsed eagerly; if parsing fails
@@ -82,11 +83,15 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
+	dashTpl, err := template.ParseFS(web, "templates/_dashboard_cards.html.tmpl")
+	if err != nil {
+		return nil, err
+	}
 	spec, err := loadSpec()
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{cfg: cfg, pages: pages, web: web, spec: spec}
+	s := &Server{cfg: cfg, pages: pages, dashCardTpl: dashTpl, web: web, spec: spec}
 	s.srv = &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           s.routes(),
@@ -127,7 +132,10 @@ func (s *Server) routes() http.Handler {
 	s.plannerRoutes(mux)
 	s.runsRoutes(mux)
 	s.nightsRoutes(mux)
+	s.nightsPageRoutes(mux)
 	s.prsRoutes(mux)
+	s.statsRoutes(mux)
+	s.dashboardRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
@@ -191,6 +199,7 @@ func parsePages(web fs.FS) (map[string]*template.Template, error) {
 		"plan":   "templates/plan.html.tmpl",
 		"runs":   "templates/runs.html.tmpl",
 		"prs":    "templates/prs.html.tmpl",
+		"nights": "templates/nights.html.tmpl",
 	}
 	funcs := template.FuncMap{
 		"inc": func(i int) int { return i + 1 },
