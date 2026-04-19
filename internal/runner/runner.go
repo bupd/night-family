@@ -32,6 +32,9 @@ type Deps struct {
 	// runs as PRs. Absent orchestrator = no PRs (useful in tests and
 	// when running against a repo the user doesn't want mutated).
 	GitOps *gitops.Orchestrator
+	// DigestDir, when set, is the on-disk directory morning digests
+	// get written into (one markdown file per night). Empty disables.
+	DigestDir string
 }
 
 // Runner orchestrates one-off duty execution.
