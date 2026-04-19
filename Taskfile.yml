@@ -1,0 +1,92 @@
+version: '3'
+
+# night-family task runner. See https://taskfile.dev.
+#
+# Usage:
+#   task            # list tasks
+#   task build      # build nf + nfd into ./bin
+#   task run        # run nfd in the foreground
+#   task test       # go test ./...
+#   task check      # vet + test + build (fast CI proxy)
+
+vars:
+  BIN_DIR: '{{.ROOT_DIR}}/bin'
+  LDFLAGS: >-
+    -X github.com/bupd/night-family/internal/version.Version={{.VERSION | default "dev"}}
+    -X github.com/bupd/night-family/internal/version.Commit={{.COMMIT | default "unknown"}}
+    -X github.com/bupd/night-family/internal/version.Date={{.DATE | default "unknown"}}
+
+tasks:
+  default:
+    desc: List tasks
+    cmd: task --list
+
+  build:
+    desc: Build nf and nfd into ./bin
+    deps: [_mkbin]
+    cmds:
+      - go build -ldflags '{{.LDFLAGS}}' -o {{.BIN_DIR}}/nf ./cmd/nf
+      - go build -ldflags '{{.LDFLAGS}}' -o {{.BIN_DIR}}/nfd ./cmd/nfd
+    sources:
+      - '**/*.go'
+      - 'internal/server/web/**/*'
+      - 'go.mod'
+      - 'go.sum'
+    generates:
+      - '{{.BIN_DIR}}/nf'
+      - '{{.BIN_DIR}}/nfd'
+
+  _mkbin:
+    internal: true
+    cmd: mkdir -p {{.BIN_DIR}}
+    status:
+      - test -d {{.BIN_DIR}}
+
+  run:
+    desc: Run nfd in the foreground
+    deps: [build]
+    cmd: '{{.BIN_DIR}}/nfd {{.CLI_ARGS}}'
+
+  test:
+    desc: Run unit tests
+    cmd: go test -race ./...
+
+  cover:
+    desc: Run tests with coverage
+    cmds:
+      - go test -race -coverprofile=coverage.txt -covermode=atomic ./...
+      - go tool cover -func=coverage.txt | tail -1
+
+  vet:
+    desc: go vet
+    cmd: go vet ./...
+
+  fmt:
+    desc: gofmt -w .
+    cmd: gofmt -w .
+
+  fmt-check:
+    desc: Fail if any file needs formatting
+    cmd: |
+      out=$(gofmt -l .)
+      if [ -n "$out" ]; then
+        echo "gofmt would modify:" >&2
+        echo "$out" >&2
+        exit 1
+      fi
+
+  tidy:
+    desc: go mod tidy
+    cmd: go mod tidy
+
+  check:
+    desc: Fast CI proxy (vet + test + build)
+    cmds:
+      - task: fmt-check
+      - task: vet
+      - task: test
+      - task: build
+
+  clean:
+    desc: Remove build artefacts
+    cmd: rm -rf {{.BIN_DIR}} coverage.txt
