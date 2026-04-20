@@ -186,6 +186,7 @@ func main() {
 		Schedule: &sched,
 		Storage:  db,
 		Runner:   run,
+		Provider: prov,
 	})
 	if err != nil {
 		fatal(logger, "server init: %v", err)
