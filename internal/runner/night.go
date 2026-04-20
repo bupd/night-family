@@ -106,9 +106,20 @@ finish:
 
 	// Write a morning digest to disk when DigestDir is configured.
 	// Best-effort — failures here don't fail the night.
-	if r.deps.DigestDir != "" {
-		if err := r.writeDigest(ctx, nightID, runs); err != nil {
+	var digestBody string
+	if r.deps.DigestDir != "" || r.deps.Notifier != nil {
+		digestBody = r.renderDigest(ctx, nightID, runs)
+	}
+	if r.deps.DigestDir != "" && digestBody != "" {
+		if err := r.writeDigestBody(nightID, digestBody); err != nil {
 			r.deps.Logger.Warn("digest write failed (non-fatal)", "night", nightID, "err", err)
+		}
+	}
+	if r.deps.Notifier != nil && digestBody != "" {
+		title := fmt.Sprintf("night-family · %s · %d runs",
+			time.Now().Format("2006-01-02"), len(runs))
+		if err := r.deps.Notifier.Notify(ctx, title, digestBody); err != nil {
+			r.deps.Logger.Warn("notifier failed (non-fatal)", "night", nightID, "err", err)
 		}
 	}
 
@@ -120,17 +131,17 @@ finish:
 	}, nil
 }
 
-// writeDigest renders and persists the morning digest for the given
-// nightID. Called at the tail of TriggerNight; errors are logged
-// rather than surfaced so a failed digest write doesn't ruin an
-// otherwise-good night.
-func (r *Runner) writeDigest(ctx context.Context, nightID string, runs []storage.Run) error {
+// renderDigest pulls the night + its runs + its PRs and returns the
+// rendered markdown. Returns "" on any DB error — callers degrade
+// gracefully (no file, no notification) rather than failing the
+// night.
+func (r *Runner) renderDigest(ctx context.Context, nightID string, runs []storage.Run) string {
 	night, err := r.deps.Storage.GetNight(ctx, nightID)
 	if err != nil {
-		return fmt.Errorf("get night: %w", err)
+		r.deps.Logger.Warn("digest: get night failed", "err", err)
+		return ""
 	}
 	prs, _ := r.deps.Storage.ListPRs(ctx, 200)
-	// Filter PRs to just the ones attached to runs from this night.
 	byRun := map[string]bool{}
 	for _, rn := range runs {
 		byRun[rn.ID] = true
@@ -141,12 +152,16 @@ func (r *Runner) writeDigest(ctx context.Context, nightID string, runs []storage
 			filtered = append(filtered, p)
 		}
 	}
-	body := digest.Render(digest.Night{Night: night, Runs: runs, PRs: filtered})
+	return digest.Render(digest.Night{Night: night, Runs: runs, PRs: filtered})
+}
 
+// writeDigestBody persists a pre-rendered digest to DigestDir.
+func (r *Runner) writeDigestBody(nightID, body string) error {
 	if err := os.MkdirAll(r.deps.DigestDir, 0o755); err != nil {
 		return err
 	}
-	name := night.StartedAt.Format("2006-01-02") + "-" + nightID + ".md"
+	// Use today's date to avoid another DB hit for StartedAt.
+	name := time.Now().UTC().Format("2006-01-02") + "-" + nightID + ".md"
 	return os.WriteFile(filepath.Join(r.deps.DigestDir, name), []byte(body), 0o644)
 }
 
