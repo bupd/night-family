@@ -21,6 +21,7 @@ import (
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/gitops"
+	"github.com/bupd/night-family/internal/notify"
 	"github.com/bupd/night-family/internal/provider"
 	"github.com/bupd/night-family/internal/runner"
 	"github.com/bupd/night-family/internal/schedule"
@@ -65,6 +66,7 @@ func main() {
 	codexBin := flag.String("codex-bin", "codex", "codex CLI binary path (used when --provider=codex)")
 	codexArgs := flag.String("codex-args", "", "extra space-separated args to pass to the codex binary")
 	digestDir := flag.String("digest-dir", "", "directory for per-night markdown digests (empty + XDG_STATE_HOME/UserHomeDir fallback)")
+	slackWebhook := flag.String("slack-webhook", os.Getenv("NF_SLACK_WEBHOOK"), "Slack/Discord incoming-webhook URL (env NF_SLACK_WEBHOOK); empty disables")
 	flag.Parse()
 
 	logger := newLogger(*logLevel)
@@ -155,6 +157,12 @@ func main() {
 	}
 	logger.Info("digests", "dir", dd)
 
+	var notifier notify.Notifier = notify.Noop{}
+	if *slackWebhook != "" {
+		notifier = notify.NewSlack(*slackWebhook)
+		logger.Info("slack webhook configured")
+	}
+
 	run, err := runner.New(runner.Deps{
 		Family:    fam,
 		Duties:    duties,
@@ -164,6 +172,7 @@ func main() {
 		GitOps:    orch,
 		RepoRoot:  *repoRoot,
 		DigestDir: dd,
+		Notifier:  notifier,
 	})
 	if err != nil {
 		fatal(logger, "runner: %v", err)
