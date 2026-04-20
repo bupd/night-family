@@ -14,6 +14,7 @@ import (
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
 	"github.com/bupd/night-family/internal/gitops"
+	"github.com/bupd/night-family/internal/notify"
 	"github.com/bupd/night-family/internal/provider"
 	"github.com/bupd/night-family/internal/storage"
 	"github.com/bupd/night-family/internal/ulid"
@@ -35,6 +36,9 @@ type Deps struct {
 	// DigestDir, when set, is the on-disk directory morning digests
 	// get written into (one markdown file per night). Empty disables.
 	DigestDir string
+	// Notifier, when non-nil, is called once per FinishNight with the
+	// rendered digest. Defaults to notify.Noop when nil.
+	Notifier notify.Notifier
 }
 
 // Runner orchestrates one-off duty execution.
