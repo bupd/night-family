@@ -41,8 +41,8 @@ func TestProviderStatusWithProber(t *testing.T) {
 // exercise the status_supported=false branch.
 type plainProvider struct{}
 
-func (plainProvider) Name() string                             { return "plain" }
-func (plainProvider) Run(_ any, _ any) (any, error)            { return nil, nil }
+func (plainProvider) Name() string                  { return "plain" }
+func (plainProvider) Run(_ any, _ any) (any, error) { return nil, nil }
 
 func TestProviderStatusWithoutProber(t *testing.T) {
 	// We can't pass a provider that doesn't satisfy the interface at
