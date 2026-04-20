@@ -5,7 +5,10 @@
 // follow-up iterations.
 package provider
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // Request is what the runner hands to a provider when dispatching a
 // duty. Everything a provider needs to form its prompt is here: the
@@ -36,4 +39,22 @@ type Result struct {
 type Provider interface {
 	Name() string
 	Run(ctx context.Context, req Request) (*Result, error)
+}
+
+// SessionStatus is a best-effort snapshot of the provider's remaining
+// capacity. Fields are independent — a provider may be able to fill
+// some but not others. Zero values mean "unknown"; Confidence tells
+// consumers how much to trust the numbers.
+type SessionStatus struct {
+	Provider                string
+	RemainingTokensEstimate int
+	WindowEndsAt            time.Time
+	Confidence              string // "low" | "medium" | "high"
+}
+
+// StatusProber is an optional interface providers may implement.
+// Absence = "I can't report session status." Runner + server degrade
+// gracefully when a provider doesn't implement it.
+type StatusProber interface {
+	SessionStatus(ctx context.Context) (SessionStatus, error)
 }
