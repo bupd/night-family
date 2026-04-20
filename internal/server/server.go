@@ -19,6 +19,7 @@ import (
 
 	"github.com/bupd/night-family/internal/duty"
 	"github.com/bupd/night-family/internal/family"
+	"github.com/bupd/night-family/internal/provider"
 	"github.com/bupd/night-family/internal/runner"
 	"github.com/bupd/night-family/internal/schedule"
 	"github.com/bupd/night-family/internal/storage"
@@ -57,6 +58,9 @@ type Config struct {
 	Storage *storage.DB
 	// Runner, when set, enables POST /api/v1/runs (dispatch).
 	Runner *runner.Runner
+	// Provider, when set, powers GET /api/v1/provider (name + optional
+	// session status probe).
+	Provider provider.Provider
 }
 
 // Server is the running HTTP server.
@@ -140,6 +144,7 @@ func (s *Server) routes() http.Handler {
 	s.metricsRoutes(mux)
 	s.digestRoutes(mux)
 	s.digestPageRoutes(mux)
+	s.providerRoutes(mux)
 	mux.HandleFunc("GET /", s.index)
 
 	if staticSub, err := fs.Sub(s.web, "static"); err == nil {
