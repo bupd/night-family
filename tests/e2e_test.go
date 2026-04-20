@@ -14,6 +14,7 @@ package e2e
 import (
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"os"
 	"os/exec"
@@ -67,10 +68,23 @@ func projectRoot() string {
 	}
 }
 
-// startNfd launches the built binary with an in-memory DB on a
-// caller-supplied port. Returns (baseURL, stop).
-func startNfd(t *testing.T, port string) (string, func()) {
+// freePort asks the OS for an unused port by binding to :0.
+func freePort(t *testing.T) string {
 	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatalf("freePort: %v", err)
+	}
+	port := l.Addr().(*net.TCPAddr).Port
+	l.Close()
+	return fmt.Sprintf("%d", port)
+}
+
+// startNfd launches the built binary with an in-memory DB on a
+// dynamically allocated port. Returns (baseURL, stop).
+func startNfd(t *testing.T) (string, func()) {
+	t.Helper()
+	port := freePort(t)
 	addr := "127.0.0.1:" + port
 	cmd := exec.Command(nfdBin, "-db", ":memory:", "-addr", addr, "-log-level", "error")
 	cmd.Stdout = os.Stderr
@@ -86,10 +100,12 @@ func startNfd(t *testing.T, port string) (string, func()) {
 	}
 }
 
-// waitForReady polls /healthz until 200 or timeout.
+// waitForReady polls /healthz with exponential backoff until 200 or timeout.
 func waitForReady(t *testing.T, base string) {
 	t.Helper()
-	deadline := time.Now().Add(5 * time.Second)
+	deadline := time.Now().Add(10 * time.Second)
+	backoff := 25 * time.Millisecond
+	const maxBackoff = 500 * time.Millisecond
 	for time.Now().Before(deadline) {
 		resp, err := http.Get(base + "/healthz")
 		if err == nil {
@@ -98,13 +114,17 @@ func waitForReady(t *testing.T, base string) {
 				return
 			}
 		}
-		time.Sleep(50 * time.Millisecond)
+		time.Sleep(backoff)
+		backoff *= 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
 	}
 	t.Fatalf("daemon never became ready at %s", base)
 }
 
 func TestE2E_FullNightThroughMock(t *testing.T) {
-	base, stop := startNfd(t, "17350")
+	base, stop := startNfd(t)
 	t.Cleanup(stop)
 
 	resp, err := http.Post(base+"/api/v1/nights/trigger",
@@ -159,7 +179,7 @@ func TestE2E_FullNightThroughMock(t *testing.T) {
 }
 
 func TestE2E_HealthAndVersion(t *testing.T) {
-	base, stop := startNfd(t, "17351")
+	base, stop := startNfd(t)
 	t.Cleanup(stop)
 
 	for _, path := range []string{"/healthz", "/readyz", "/version", "/openapi.yaml", "/api/v1/family"} {

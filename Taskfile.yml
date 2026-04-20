@@ -88,6 +88,10 @@ tasks:
       - task: test
       - task: build
 
+  flaky:
+    desc: Run flakiness analyzer (default 5 runs)
+    cmd: scripts/test-flakiness.sh {{.CLI_ARGS | default "5"}}
+
   clean:
     desc: Remove build artefacts
     cmd: rm -rf {{.BIN_DIR}} coverage.txt
