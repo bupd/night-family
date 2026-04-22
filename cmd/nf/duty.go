@@ -65,7 +65,9 @@ func dutyList(args []string) {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 			d.Type, d.Output, d.CostTier, d.Risk, d.Description)
 	}
-	_ = tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+	}
 }
 
 func dutyShow(args []string) {

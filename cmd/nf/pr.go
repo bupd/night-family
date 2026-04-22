@@ -54,9 +54,14 @@ func prList(args []string) {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "OPENED\tMEMBER\tDUTY\tSTATE\tURL")
 	for _, it := range items {
-		m := it.(map[string]any)
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\n",
 			m["opened_at"], m["member"], m["duty"], m["state"], m["url"])
 	}
-	_ = tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+	}
 }
