@@ -56,7 +56,10 @@ func nightList(_ []string) {
 	tw := tabwriter.NewWriter(os.Stdout, 0, 0, 2, ' ', 0)
 	fmt.Fprintln(tw, "ID\tSTARTED\tFINISHED\tSUMMARY")
 	for _, it := range items {
-		m := it.(map[string]any)
+		m, ok := it.(map[string]any)
+		if !ok {
+			continue
+		}
 		started, _ := m["started_at"].(string)
 		finished, _ := m["finished_at"].(string)
 		if finished == "" {
@@ -65,7 +68,9 @@ func nightList(_ []string) {
 		summary, _ := m["summary"].(string)
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\n", m["id"], started, finished, summary)
 	}
-	_ = tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+	}
 }
 
 func nightShow(args []string) {
@@ -181,7 +186,9 @@ func nightPreview(args []string) {
 		fmt.Fprintf(tw, "%d\t%s\t%s\t%s\t%s\t%s\t%s\t%d\n",
 			i+1, s.Member, s.Duty, s.Priority, s.Output, s.CostTier, s.Risk, s.EstimatedTokens)
 	}
-	_ = tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+	}
 	if len(plan.Skipped) > 0 {
 		fmt.Println("\nSkipped:")
 		for _, sk := range plan.Skipped {

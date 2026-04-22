@@ -148,7 +148,9 @@ func familyList(args []string) {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\n",
 			m.Name, m.RiskTolerance, m.CostTier, duties, m.Role)
 	}
-	_ = tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+	}
 }
 
 func familyShow(args []string) {

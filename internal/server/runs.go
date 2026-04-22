@@ -40,11 +40,11 @@ func (s *Server) createRun(w http.ResponseWriter, r *http.Request) {
 		writeProblem(w, http.StatusBadRequest, "bad_request", "member and duty are required", r.URL.Path)
 		return
 	}
-	// Use a detached context with a generous timeout so the handler
-	// returns the final (not merely queued) run once the mock
-	// finishes. When providers get expensive we'll flip this to
-	// async + 202 Accepted.
-	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Minute)
+	// Derive from the request context so that client cancellation
+	// propagates. The generous timeout ensures the handler returns
+	// the final (not merely queued) run once the mock finishes.
+	// When providers get expensive we'll flip this to async + 202 Accepted.
+	ctx, cancel := context.WithTimeout(r.Context(), 2*time.Minute)
 	defer cancel()
 	run, err := s.cfg.Runner.Dispatch(ctx, runner.DispatchRequest{
 		Member: req.Member, Duty: req.Duty, Args: req.Args,

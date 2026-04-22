@@ -67,9 +67,10 @@ func (s *Server) triggerNight(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	}
-	// Give the night a generous ceiling; individual mock runs are
-	// ~20ms each, so a full plan finishes well inside this.
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	// Derive from the request context so that client cancellation
+	// propagates. The generous ceiling covers full plans; individual
+	// mock runs are ~20ms each, so they finish well inside this.
+	ctx, cancel := context.WithTimeout(r.Context(), 10*time.Minute)
 	defer cancel()
 	res, err := s.cfg.Runner.TriggerNight(ctx, s.cfg.Schedule, runner.NightOptions{
 		OnlyMembers: req.OnlyMembers,

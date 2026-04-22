@@ -141,7 +141,11 @@ func (r *Runner) renderDigest(ctx context.Context, nightID string, runs []storag
 		r.deps.Logger.Warn("digest: get night failed", "err", err)
 		return ""
 	}
-	prs, _ := r.deps.Storage.ListPRs(ctx, 200)
+	prs, err := r.deps.Storage.ListPRs(ctx, 200)
+	if err != nil {
+		r.deps.Logger.Warn("digest: list PRs failed", "err", err)
+		return ""
+	}
 	byRun := map[string]bool{}
 	for _, rn := range runs {
 		byRun[rn.ID] = true

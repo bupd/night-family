@@ -108,13 +108,17 @@ func (db *DB) migrate(ctx context.Context) error {
 	return nil
 }
 
-func (db *DB) applyMigration(ctx context.Context, name, sqlText string) error {
+func (db *DB) applyMigration(ctx context.Context, name, sqlText string) (err error) {
 	tx, err := db.raw.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer func() { _ = tx.Rollback() }()
-	if _, err := tx.ExecContext(ctx, sqlText); err != nil {
+	defer func() {
+		if err != nil {
+			_ = tx.Rollback()
+		}
+	}()
+	if _, err = tx.ExecContext(ctx, sqlText); err != nil {
 		return err
 	}
 	return tx.Commit()

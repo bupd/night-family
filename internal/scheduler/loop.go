@@ -42,7 +42,7 @@ type Loop struct {
 	opts     Options
 	mu       sync.Mutex
 	lastFire time.Time
-	running  bool
+	once     sync.Once
 }
 
 // New returns a Loop ready to be Start()-ed.
@@ -58,14 +58,9 @@ func New(opts Options) *Loop {
 
 // Start spawns the loop. Safe to call twice — second call is a no-op.
 func (l *Loop) Start(ctx context.Context) {
-	l.mu.Lock()
-	if l.running {
-		l.mu.Unlock()
-		return
-	}
-	l.running = true
-	l.mu.Unlock()
-	go l.run(ctx)
+	l.once.Do(func() {
+		go l.run(ctx)
+	})
 }
 
 // LastFire returns the wall time of the most recent auto-fire, or

@@ -106,7 +106,9 @@ func runList(args []string) {
 		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s\t%s\n",
 			r.ID, r.Member, r.Duty, r.Status, r.StartedAt, pr)
 	}
-	_ = tw.Flush()
+	if err := tw.Flush(); err != nil {
+		fmt.Fprintln(os.Stderr, "nf:", err)
+	}
 }
 
 func runStart(args []string) {
