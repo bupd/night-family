@@ -33,6 +33,10 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	fmt.Fprintf(w, "# TYPE nf_uptime_seconds counter\n")
 	fmt.Fprintf(w, "nf_uptime_seconds %f\n", time.Since(bootedAt).Seconds())
 
+	if s.collector != nil {
+		s.collector.writePrometheus(w)
+	}
+
 	if s.cfg.Storage == nil {
 		return
 	}
@@ -67,4 +71,12 @@ func (s *Server) metrics(w http.ResponseWriter, r *http.Request) {
 	for state, n := range stats.PRsByState {
 		fmt.Fprintf(w, "nf_prs_by_state{state=%q} %d\n", state, n)
 	}
+
+	fmt.Fprintf(w, "# HELP nf_tokens_in_total Total input tokens consumed across all runs.\n")
+	fmt.Fprintf(w, "# TYPE nf_tokens_in_total counter\n")
+	fmt.Fprintf(w, "nf_tokens_in_total %d\n", stats.TokensIn)
+
+	fmt.Fprintf(w, "# HELP nf_tokens_out_total Total output tokens produced across all runs.\n")
+	fmt.Fprintf(w, "# TYPE nf_tokens_out_total counter\n")
+	fmt.Fprintf(w, "nf_tokens_out_total %d\n", stats.TokensOut)
 }
