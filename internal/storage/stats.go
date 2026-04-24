@@ -12,6 +12,8 @@ type Stats struct {
 	RunsByStatus map[string]int `json:"runs_by_status"`
 	PRs          int            `json:"prs"`
 	PRsByState   map[string]int `json:"prs_by_state"`
+	TokensIn     int64          `json:"tokens_in"`
+	TokensOut    int64          `json:"tokens_out"`
 }
 
 // Stats returns a single-query snapshot.
@@ -57,5 +59,10 @@ func (db *DB) Stats(ctx context.Context) (Stats, error) {
 		s.PRsByState[st] = n
 	}
 	rows.Close()
+
+	_ = db.raw.QueryRowContext(ctx,
+		`SELECT COALESCE(SUM(tokens_in),0), COALESCE(SUM(tokens_out),0) FROM runs`,
+	).Scan(&s.TokensIn, &s.TokensOut)
+
 	return s, nil
 }

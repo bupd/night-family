@@ -71,6 +71,7 @@ type Server struct {
 	dashCardTpl *template.Template
 	web         fs.FS
 	spec        *specBundle
+	collector   *httpCollector
 }
 
 // New constructs a Server. Templates are parsed eagerly; if parsing fails
@@ -95,7 +96,7 @@ func New(cfg Config) (*Server, error) {
 	if err != nil {
 		return nil, err
 	}
-	s := &Server{cfg: cfg, pages: pages, dashCardTpl: dashTpl, web: web, spec: spec}
+	s := &Server{cfg: cfg, pages: pages, dashCardTpl: dashTpl, web: web, spec: spec, collector: newHTTPCollector()}
 	s.srv = &http.Server{
 		Addr:              cfg.Addr,
 		Handler:           s.routes(),
@@ -151,7 +152,7 @@ func (s *Server) routes() http.Handler {
 		mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServerFS(staticSub)))
 	}
 
-	return logMiddleware(s.cfg.Logger, mux)
+	return logMiddleware(s.cfg.Logger, s.collector, mux)
 }
 
 func (s *Server) healthz(w http.ResponseWriter, _ *http.Request) {
@@ -232,17 +233,25 @@ func writeJSON(w http.ResponseWriter, status int, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
-func logMiddleware(logger *slog.Logger, next http.Handler) http.Handler {
+func logMiddleware(logger *slog.Logger, col *httpCollector, next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		start := time.Now()
 		rw := &statusRecorder{ResponseWriter: w, status: 200}
 		next.ServeHTTP(rw, r)
+		dur := time.Since(start)
+		route := r.Pattern
+		if route == "" {
+			route = r.URL.Path
+		}
 		logger.Info("http",
 			"method", r.Method,
 			"path", r.URL.Path,
 			"status", rw.status,
-			"dur", time.Since(start).String(),
+			"dur", dur.String(),
 		)
+		if col != nil {
+			col.record(r.Method, route, rw.status, dur.Seconds())
+		}
 	})
 }
 
