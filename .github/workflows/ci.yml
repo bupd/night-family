@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    name: vet / test / build
+  lint:
+    name: lint
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -39,13 +39,29 @@ jobs:
       - name: go vet
         run: go vet ./...
 
+  test-build:
+    name: test / build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: 'stable'
+          check-latest: true
+          cache: true
+
+      - name: Download modules
+        run: go mod download
+
       - name: go test
         run: go test -race ./...
 
       - name: go build
         run: |
-          go build -o /tmp/nf ./cmd/nf
-          go build -o /tmp/nfd ./cmd/nfd
+          go build -trimpath -o /tmp/nf ./cmd/nf
+          go build -trimpath -o /tmp/nfd ./cmd/nfd
 
       - name: smoke test nfd
         run: |
