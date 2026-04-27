@@ -23,10 +23,13 @@ tasks:
 
   build:
     desc: Build nf and nfd into ./bin
+    deps: [_build-nf, _build-nfd]
+    method: checksum
+
+  _build-nf:
+    internal: true
     deps: [_mkbin]
-    cmds:
-      - go build -ldflags '{{.LDFLAGS}}' -o {{.BIN_DIR}}/nf ./cmd/nf
-      - go build -ldflags '{{.LDFLAGS}}' -o {{.BIN_DIR}}/nfd ./cmd/nfd
+    cmd: go build -trimpath -ldflags '{{.LDFLAGS}}' -o {{.BIN_DIR}}/nf ./cmd/nf
     sources:
       - '**/*.go'
       - 'internal/server/web/**/*'
@@ -35,7 +38,21 @@ tasks:
       - 'go.sum'
     generates:
       - '{{.BIN_DIR}}/nf'
+    method: checksum
+
+  _build-nfd:
+    internal: true
+    deps: [_mkbin]
+    cmd: go build -trimpath -ldflags '{{.LDFLAGS}}' -o {{.BIN_DIR}}/nfd ./cmd/nfd
+    sources:
+      - '**/*.go'
+      - 'internal/server/web/**/*'
+      - 'internal/server/apiassets/**/*'
+      - 'go.mod'
+      - 'go.sum'
+    generates:
       - '{{.BIN_DIR}}/nfd'
+    method: checksum
 
   _mkbin:
     internal: true
