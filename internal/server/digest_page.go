@@ -50,14 +50,22 @@ func (s *Server) digestPage(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
-	runs, _ := s.cfg.Storage.ListRuns(ctx, storage.ListRunsFilter{Limit: 500})
+	runs, err := s.cfg.Storage.ListRuns(ctx, storage.ListRunsFilter{Limit: 500})
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	filtered := runs[:0]
 	for _, rn := range runs {
 		if rn.NightID != nil && *rn.NightID == id {
 			filtered = append(filtered, rn)
 		}
 	}
-	prs, _ := s.cfg.Storage.ListPRs(ctx, 500)
+	prs, err := s.cfg.Storage.ListPRs(ctx, 500)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 	byRun := map[string]bool{}
 	for _, rn := range filtered {
 		byRun[rn.ID] = true

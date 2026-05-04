@@ -33,29 +33,33 @@ func (db *DB) Stats(ctx context.Context) (Stats, error) {
 	if err != nil {
 		return s, err
 	}
+	defer rows.Close()
 	for rows.Next() {
 		var st string
 		var n int
 		if err := rows.Scan(&st, &n); err != nil {
-			rows.Close()
 			return s, err
 		}
 		s.RunsByStatus[st] = n
 	}
-	rows.Close()
-	rows, err = db.raw.QueryContext(ctx, `SELECT state, COUNT(*) FROM prs GROUP BY state`)
+	if err := rows.Err(); err != nil {
+		return s, err
+	}
+	rows2, err := db.raw.QueryContext(ctx, `SELECT state, COUNT(*) FROM prs GROUP BY state`)
 	if err != nil {
 		return s, err
 	}
-	for rows.Next() {
+	defer rows2.Close()
+	for rows2.Next() {
 		var st string
 		var n int
-		if err := rows.Scan(&st, &n); err != nil {
-			rows.Close()
+		if err := rows2.Scan(&st, &n); err != nil {
 			return s, err
 		}
 		s.PRsByState[st] = n
 	}
-	rows.Close()
+	if err := rows2.Err(); err != nil {
+		return s, err
+	}
 	return s, nil
 }

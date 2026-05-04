@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -105,7 +104,8 @@ func (db *DB) ListRuns(ctx context.Context, f ListRunsFilter) ([]Run, error) {
 	if f.Limit <= 0 || f.Limit > 500 {
 		f.Limit = 50
 	}
-	q += fmt.Sprintf(" LIMIT %d", f.Limit)
+	q += " LIMIT ?"
+	args = append(args, f.Limit)
 	rows, err := db.raw.QueryContext(ctx, q, args...)
 	if err != nil {
 		return nil, err

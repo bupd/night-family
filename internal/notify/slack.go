@@ -56,7 +56,10 @@ func (s *Slack) Notify(ctx context.Context, title, body string) error {
 		body = body[:3000] + "\n…(truncated)"
 	}
 	payload := map[string]string{"text": title + "\n\n" + body}
-	raw, _ := json.Marshal(payload)
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("slack: marshal payload: %w", err)
+	}
 
 	cctx, cancel := context.WithTimeout(ctx, s.Timeout)
 	defer cancel()

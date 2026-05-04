@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -58,9 +57,9 @@ func (db *DB) ListPRs(ctx context.Context, limit int) ([]PR, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 50
 	}
-	rows, err := db.raw.QueryContext(ctx, fmt.Sprintf(`
+	rows, err := db.raw.QueryContext(ctx, `
 		SELECT id, run_id, url, title, member, duty, opened_at, merged_at, state
-		FROM prs ORDER BY opened_at DESC LIMIT %d`, limit))
+		FROM prs ORDER BY opened_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
