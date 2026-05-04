@@ -54,7 +54,10 @@ func (r *Runner) TriggerNight(ctx context.Context, sched *schedule.Schedule, opt
 	nightID := ulid.Make("night")
 	started := time.Now().UTC()
 
-	planJSON, _ := json.Marshal(plan)
+	planJSON, err := json.Marshal(plan)
+	if err != nil {
+		return NightResult{}, fmt.Errorf("runner: marshal plan: %w", err)
+	}
 	if err := r.deps.Storage.InsertNight(ctx, storage.Night{
 		ID:        nightID,
 		StartedAt: started,

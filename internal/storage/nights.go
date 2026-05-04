@@ -4,7 +4,6 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"fmt"
 	"time"
 )
 
@@ -68,9 +67,9 @@ func (db *DB) ListNights(ctx context.Context, limit int) ([]Night, error) {
 	if limit <= 0 || limit > 500 {
 		limit = 50
 	}
-	rows, err := db.raw.QueryContext(ctx, fmt.Sprintf(`
+	rows, err := db.raw.QueryContext(ctx, `
 		SELECT id, started_at, finished_at, plan_json, summary
-		FROM nights ORDER BY started_at DESC LIMIT %d`, limit))
+		FROM nights ORDER BY started_at DESC LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}

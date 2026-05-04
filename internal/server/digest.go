@@ -49,7 +49,11 @@ func (s *Server) getNightDigest(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	prs, _ := s.cfg.Storage.ListPRs(ctx, 500)
+	prs, err := s.cfg.Storage.ListPRs(ctx, 500)
+	if err != nil {
+		writeProblem(w, http.StatusInternalServerError, "db_error", err.Error(), r.URL.Path)
+		return
+	}
 	byRun := map[string]bool{}
 	for _, rn := range filtered {
 		byRun[rn.ID] = true
